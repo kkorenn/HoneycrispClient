@@ -1,0 +1,342 @@
+package dev.honeycrisp.v1_8_9;
+
+import dev.honeycrisp.Honeycrisp;
+import dev.honeycrisp.hooks.Crosshair;
+import dev.honeycrisp.hooks.Hooks;
+import dev.honeycrisp.hooks.OldAnimation;
+import dev.honeycrisp.platform.Keys;
+import dev.honeycrisp.ui.screens.MenuActions;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.entity.EntityPlayerSP;
+import net.minecraft.client.gui.GuiLanguage;
+import net.minecraft.client.gui.GuiMainMenu;
+import net.minecraft.client.gui.GuiMultiplayer;
+import net.minecraft.client.gui.GuiOptions;
+import net.minecraft.client.gui.GuiSelectWorld;
+import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.client.renderer.GlStateManager;
+import net.minecraft.client.settings.KeyBinding;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.item.EntityItem;
+import net.minecraft.world.storage.WorldInfo;
+import net.minecraftforge.client.event.EntityViewRenderEvent;
+import net.minecraftforge.client.event.GuiOpenEvent;
+import net.minecraftforge.client.event.GuiScreenEvent;
+import net.minecraftforge.client.event.MouseEvent;
+import net.minecraftforge.client.event.RenderGameOverlayEvent;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.event.FMLInitializationEvent;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.InputEvent;
+import net.minecraftforge.fml.common.gameevent.TickEvent;
+import org.lwjgl.input.Keyboard;
+import org.lwjgl.input.Mouse;
+
+import java.nio.FloatBuffer;
+
+/** Translates Forge events (and the coremod's call sites, the static methods at the bottom) into core Hooks. */
+@Mod(modid = "honeycrisp", name = "Honeycrisp Client", useMetadata = true, clientSideOnly = true, acceptableRemoteVersions = "*",
+	dependencies = "required-after:graft")
+public final class HoneycrispMod {
+	private float savedSensitivity = -1;
+	private float savedGamma = -1;
+	private WorldInfo savedTimeInfo;
+	private long savedTime;
+	private int savedPerspective = -1;
+
+	private static Hooks hooks() {
+		return Honeycrisp.hooks();
+	}
+
+	@Mod.EventHandler
+	public void init(FMLInitializationEvent event) {
+		try {
+			Honeycrisp.init(new Platform189());
+		} catch (Throwable t) {
+			System.err.println("[Honeycrisp Client] init failed, running vanilla: " + t);
+			return;
+		}
+		MinecraftForge.EVENT_BUS.register(this);
+		final Minecraft mc = Minecraft.getMinecraft();
+		MenuActions.set(new MenuActions() { // same screens GuiMainMenu opens; the current (Honeycrisp Client) menu is the parent
+			@Override
+			public void singleplayer() {
+				mc.displayGuiScreen(new GuiSelectWorld(mc.currentScreen));
+			}
+
+			@Override
+			public void multiplayer() {
+				mc.displayGuiScreen(new GuiMultiplayer(mc.currentScreen));
+			}
+
+			@Override
+			public void options() {
+				mc.displayGuiScreen(new GuiOptions(mc.currentScreen, mc.gameSettings));
+			}
+
+			@Override
+			public void language() {
+				mc.displayGuiScreen(new GuiLanguage(mc.currentScreen, mc.gameSettings, mc.getLanguageManager()));
+			}
+
+			@Override
+			public void quit() {
+				mc.shutdown();
+			}
+		});
+	}
+
+	@SubscribeEvent
+	public void onClientTick(TickEvent.ClientTickEvent event) {
+		Hooks h = hooks();
+		if (h == null) {
+			return;
+		}
+		if (event.phase == TickEvent.Phase.END) {
+			h.onClientTick();
+			return;
+		}
+		Minecraft mc = Minecraft.getMinecraft();
+		if (mc.thePlayer == null) {
+			return;
+		}
+		hold(mc.gameSettings.keyBindSprint, h.sprintHeld(), mc);
+		hold(mc.gameSettings.keyBindSneak, h.sneakHeld(), mc);
+		EntityPlayerSP p = mc.thePlayer;
+		if (p.isUsingItem() && mc.gameSettings.keyBindAttack.isKeyDown() && h.oldAnimation(OldAnimation.SWING)
+			&& (!p.isSwingInProgress || p.swingProgressInt < 0 || p.swingProgressInt >= 3)) {
+			// 1.7: the arm swings while using an item (client-side only, no packet); 3 = half the unhasted swing
+			p.swingProgressInt = -1;
+			p.isSwingInProgress = true;
+		}
+		boolean free = h.freelookActive() && h.freelookThirdPerson();
+		if (free && savedPerspective < 0) {
+			savedPerspective = mc.gameSettings.thirdPersonView;
+			mc.gameSettings.thirdPersonView = 1;
+		} else if (!free && savedPerspective >= 0) {
+			mc.gameSettings.thirdPersonView = savedPerspective;
+			savedPerspective = -1;
+		}
+	}
+
+	/** Toggle sprint/sneak: the binding reads as held while the core says so, else as the physical key. */
+	private static void hold(KeyBinding binding, boolean toggled, Minecraft mc) {
+		int code = binding.getKeyCode();
+		boolean physical = mc.currentScreen == null
+			&& (code < 0 ? Mouse.isButtonDown(code + 100) : code > 0 && Keyboard.isKeyDown(code));
+		KeyBinding.setKeyBindState(code, toggled || physical);
+	}
+
+	@SubscribeEvent
+	public void onRenderTick(TickEvent.RenderTickEvent event) {
+		Hooks h = hooks();
+		Minecraft mc = Minecraft.getMinecraft();
+		if (h == null) {
+			return;
+		}
+		if (event.phase == TickEvent.Phase.START) {
+			double m = h.mouseSensitivityMultiplier();
+			if (m != 1) { // vanilla: delta * (s * 0.6 + 0.2)^3 * 8, so scale the base by cbrt(m)
+				savedSensitivity = mc.gameSettings.mouseSensitivity;
+				float f = (float)((savedSensitivity * 0.6F + 0.2F) * Math.cbrt(m));
+				mc.gameSettings.mouseSensitivity = (f - 0.2F) / 0.6F;
+			}
+			if (h.freelookActive() && mc.renderGlobal != null) {
+				mc.renderGlobal.setDisplayListEntitiesDirty(); // the camera turns while the player's rotation does not
+			}
+			double gamma = h.gammaOverride();
+			if (gamma >= 0) {
+				savedGamma = mc.gameSettings.gammaSetting;
+				mc.gameSettings.gammaSetting = (float) gamma;
+			}
+			// Time Changer: only the frame sees it; ticks and server time packets run outside the render tick.
+			long time = h.fixedDayTime();
+			if (time >= 0 && mc.theWorld != null) {
+				savedTimeInfo = mc.theWorld.getWorldInfo();
+				savedTime = savedTimeInfo.getWorldTime();
+				savedTimeInfo.setWorldTime(savedTime / 24000L * 24000L + time);
+			}
+			return;
+		}
+		if (savedSensitivity >= 0) {
+			mc.gameSettings.mouseSensitivity = savedSensitivity;
+			savedSensitivity = -1;
+		}
+		if (savedGamma >= 0) {
+			mc.gameSettings.gammaSetting = savedGamma;
+			savedGamma = -1;
+		}
+		if (savedTimeInfo != null) {
+			savedTimeInfo.setWorldTime(savedTime);
+			savedTimeInfo = null;
+		}
+	}
+
+	@SubscribeEvent
+	public void onKeyInput(InputEvent.KeyInputEvent event) {
+		key(false);
+	}
+
+	@SubscribeEvent
+	public void onScreenKey(GuiScreenEvent.KeyboardInputEvent.Pre event) {
+		if (key(true) && event.isCancelable()) {
+			event.setCanceled(true);
+		}
+	}
+
+	private static boolean key(boolean screenOpen) {
+		Hooks h = hooks();
+		int key = KeyMap.toGlfw(Keyboard.getEventKey());
+		if (h == null || key == Keys.UNKNOWN) {
+			return false;
+		}
+		int action = !Keyboard.getEventKeyState() ? Keys.RELEASE : Keyboard.isRepeatEvent() ? Keys.REPEAT : Keys.PRESS;
+		return h.onKey(key, action, screenOpen);
+	}
+
+	/** Only fired by runTick's in-world mouse loop (screens drain Mouse.next themselves). */
+	@SubscribeEvent
+	public void onMouse(MouseEvent event) {
+		Hooks h = hooks();
+		if (h == null) {
+			return;
+		}
+		boolean screen = Minecraft.getMinecraft().currentScreen != null;
+		if (event.button >= 0) {
+			h.onMouseButton(event.button, event.buttonstate ? Keys.PRESS : Keys.RELEASE, screen);
+		}
+		if (event.dwheel != 0 && !screen && h.onScroll(event.dwheel / 120.0)) {
+			event.setCanceled(true); // skips runTick's hotbar scroll for this event
+		}
+	}
+
+	@SubscribeEvent
+	public void onScreenMouse(GuiScreenEvent.MouseInputEvent.Pre event) {
+		Hooks h = hooks();
+		int button = Mouse.getEventButton();
+		if (h != null && button >= 0) {
+			h.onMouseButton(button, Mouse.getEventButtonState() ? Keys.PRESS : Keys.RELEASE, true);
+		}
+	}
+
+	@SubscribeEvent
+	public void onHud(RenderGameOverlayEvent.Post event) {
+		Hooks h = hooks();
+		if (h != null && event.type == RenderGameOverlayEvent.ElementType.ALL) {
+			h.onRenderHud(event.partialTicks);
+		}
+	}
+
+	@SubscribeEvent
+	public void onCrosshair(RenderGameOverlayEvent.Pre event) {
+		Hooks h = hooks();
+		Crosshair c = h == null || event.type != RenderGameOverlayEvent.ElementType.CROSSHAIRS ? null : h.crosshair();
+		if (c != null) {
+			event.setCanceled(true);
+			ScaledResolution r = event.resolution;
+			c.draw(Honeycrisp.platform().renderer(), r.getScaledWidth() / 2F, r.getScaledHeight() / 2F);
+		}
+	}
+
+	@SubscribeEvent
+	public void onFov(EntityViewRenderEvent.FOVModifier event) {
+		Hooks h = hooks();
+		if (h != null) {
+			event.setFOV((float)(event.getFOV() * h.fovMultiplier((float)event.renderPartialTicks)));
+		}
+	}
+
+	@SubscribeEvent
+	public void onGuiOpen(GuiOpenEvent event) {
+		Hooks h = hooks();
+		if (h != null && event.gui instanceof GuiMainMenu && h.replaceMainMenu()) {
+			Platform189.opening = event;
+			try {
+				h.openMainMenu();
+			} finally {
+				Platform189.opening = null;
+			}
+		}
+	}
+
+	// Called from code patched by dev.honeycrisp.v1_8_9.coremod.Transformer.
+
+	/** EntityRenderer.updateCameraAndRender: player.setAngles(dx, dy). */
+	public static void setAngles(Entity entity, float dx, float dy) {
+		Hooks h = hooks();
+		if (h == null || !h.consumeMouseLook(dx, dy)) {
+			entity.setAngles(dx, dy);
+		}
+	}
+
+	/** EntityRenderer.orientCamera: every read of the view entity's (prev)rotationYaw. */
+	public static float cameraYaw(float yaw) {
+		Hooks h = hooks();
+		return h != null && h.freelookActive() ? h.freelookYaw() : yaw;
+	}
+
+	public static float cameraPitch(float pitch) {
+		Hooks h = hooks();
+		return h != null && h.freelookActive() ? h.freelookPitch() : pitch;
+	}
+
+	/** RendererLivingEntity.setBrightness: the hurt tint's put(1), put(0), put(0), put(0.3) (channel 0-3 = r, g, b, a). */
+	public static FloatBuffer hurtTint(FloatBuffer buffer, float vanilla, int channel) {
+		Hooks h = hooks();
+		int c = h == null ? 0 : h.hitColor();
+		if (c == 0) {
+			return buffer.put(vanilla);
+		}
+		int shift = channel == 3 ? 24 : 16 - channel * 8;
+		return buffer.put((c >>> shift & 255) / 255F);
+	}
+
+	/** GuiNewChat.drawChat: the line background's color (alpha = half the fading text alpha). */
+	public static int chatBackground(int color) {
+		Hooks h = hooks();
+		float o = h == null ? -1 : h.chatBackgroundOpacity();
+		if (o < 0) {
+			return color;
+		}
+		int fade = Math.min(255, (color >>> 24) * 2); // 0..255 like the text
+		return Math.round(fade * o) << 24 | color & 0xFFFFFF;
+	}
+
+	/** GuiIngame.renderScoreboard: sb.append(score.getScorePoints()). */
+	public static StringBuilder scoreAppend(StringBuilder sb, int points) {
+		Hooks h = hooks();
+		return h != null && h.hideScoreboardNumbers() ? sb : sb.append(points);
+	}
+
+	/** ItemRenderer.renderItemInFirstPerson: the constant 0 swing passed to transformFirstPersonItem while using an item. */
+	public static float useSwing(float vanilla, float swing, int branch) {
+		Hooks h = hooks();
+		OldAnimation a = branch == 1 ? OldAnimation.EAT_DRINK : branch == 2 ? OldAnimation.BLOCK_HIT : branch == 3 ? OldAnimation.BOW : null;
+		return h != null && a != null && h.oldAnimation(a) ? swing : vanilla;
+	}
+
+	/** LayerArmorBase.shouldCombineTextures: true lets the hurt tint reach armor. */
+	public static boolean armorFlash(boolean vanilla) {
+		Hooks h = hooks();
+		return vanilla || h != null && h.oldAnimation(OldAnimation.ARMOR_DAMAGE_FLASH);
+	}
+
+	/** RenderEntityItem.func_177077_a: the bob's sin(); -1 makes the bob 0. */
+	public static float itemBob(float sin) {
+		Hooks h = hooks();
+		return h != null && h.itemPhysics() ? -1 : sin;
+	}
+
+	/** RenderEntityItem.func_177077_a: the spin rotate(angle, 0, 1, 0). Item physics: fixed per-item yaw, laid flat. */
+	public static void itemSpin(float angle, float x, float y, float z, EntityItem item) {
+		Hooks h = hooks();
+		if (h != null && h.itemPhysics()) {
+			// ponytail: lies 0.25 * ground scale above the floor (vanilla bob base); per-model ground offset if it looks off
+			GlStateManager.rotate(item.hoverStart * 57.29578F, 0, 1, 0);
+			GlStateManager.rotate(90, 1, 0, 0);
+		} else {
+			GlStateManager.rotate(angle, x, y, z);
+		}
+	}
+}

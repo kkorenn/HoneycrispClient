@@ -1,0 +1,59 @@
+plugins { id 'java-library' }
+
+// Forge 1.7.10 has no essential-loom support (Graft's 1.7.10 module is plain too). The adapter has to subclass
+// GuiScreen, so it compiles against the MCP-named forgeBin jar that ForgeGradle 1.2 leaves in the Gradle cache, and the
+// jar is then reobfuscated to SRG (what FML runs) with SpecialSource and the same cache's mcp-srg.srg.
+base.archivesName = 'honeycrisp-1.7.10'
+java.toolchain.languageVersion = JavaLanguageVersion.of(8)
+
+def forgeDir = new File(gradle.gradleUserHomeDir, 'caches/minecraft/net/minecraftforge/forge/1.7.10-10.13.4.1614-1.7.10')
+def forgeBin = new File(forgeDir, 'forgeBin-1.7.10-10.13.4.1614-1.7.10.jar')
+def mcpToSrg = new File(forgeDir, 'srgs/mcp-srg.srg')
+if (!forgeBin.file || !mcpToSrg.file) {
+	throw new GradleException("mc1_7_10 needs ${forgeBin} and ${mcpToSrg}: run setupDecompWorkspace once in any ForgeGradle 1.2 1.7.10-10.13.4.1614 project")
+}
+
+repositories {
+	maven { url = 'https://maven.minecraftforge.net/'; metadataSources { mavenPom(); artifact() } }
+	maven { url = 'https://libraries.minecraft.net/'; metadataSources { mavenPom(); artifact() } }
+	mavenCentral()
+}
+
+configurations { specialSource }
+
+dependencies {
+	compileOnly files(forgeBin)
+	compileOnly 'net.minecraft:launchwrapper:1.12@jar'
+	compileOnly 'org.lwjgl.lwjgl:lwjgl:2.9.1@jar'
+	compileOnly 'org.ow2.asm:asm-debug-all:5.0.3'
+	implementation project(':core')
+	specialSource 'net.md-5:SpecialSource:1.11.4:shaded@jar'
+}
+
+jar {
+	archiveClassifier = 'dev'
+	from(project(':core').sourceSets.main.output)
+	manifest.attributes(
+		'FMLCorePlugin': 'dev.honeycrisp.v1_7_10.coremod.HoneycrispPlugin',
+		'FMLCorePluginContainsFMLMod': 'true'
+	)
+}
+
+def reobfJar = tasks.register('reobfJar', JavaExec) {
+	def input = jar.archiveFile
+	def output = layout.buildDirectory.file("libs/honeycrisp-1.7.10-${project.version}.jar")
+	inputs.file input
+	inputs.file mcpToSrg
+	outputs.file output
+	// --live: Minecraft's class hierarchy (inherited and overridden members) comes from forgeBin on this classpath.
+	classpath = configurations.specialSource + files(forgeBin)
+	mainClass = 'net.md_5.specialsource.SpecialSource'
+	args '--live', '--in-jar', input.get().asFile, '--out-jar', output.get().asFile, '--srg-in', mcpToSrg
+}
+assemble.dependsOn reobfJar
+
+processResources {
+	def version = project.version
+	inputs.property 'version', version
+	filesMatching('mcmod.info') { expand 'version': version }
+}

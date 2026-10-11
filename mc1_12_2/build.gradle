@@ -1,0 +1,34 @@
+plugins {
+	id 'gg.essential.loom' version '1.15.50'
+	id 'dev.architectury.architectury-pack200' version '0.1.3'
+}
+
+base.archivesName = 'honeycrisp-1.12.2'
+java.toolchain.languageVersion = JavaLanguageVersion.of(8)
+
+loom {
+	forge { pack200Provider.set(new dev.architectury.pack200.java.Pack200Adapter()) }
+	runConfigs.client { property 'fml.coreMods.load', 'dev.honeycrisp.v1_12_2.coremod.HoneycrispPlugin' }
+}
+
+dependencies {
+	minecraft 'com.mojang:minecraft:1.12.2'
+	mappings 'de.oceanlabs.mcp:mcp_stable:39-1.12'
+	forge 'net.minecraftforge:forge:1.12.2-14.23.5.2847'
+	implementation project(':core')
+}
+
+jar {
+	from(project(':core').sourceSets.main.output)
+	manifest.attributes(
+		'FMLCorePlugin': 'dev.honeycrisp.v1_12_2.coremod.HoneycrispPlugin',
+		'FMLCorePluginContainsFMLMod': 'true',
+		'ForceLoadAsMod': 'true'
+	)
+}
+
+processResources {
+	def version = project.version
+	inputs.property 'version', version
+	filesMatching('mcmod.info') { expand 'version': version }
+}

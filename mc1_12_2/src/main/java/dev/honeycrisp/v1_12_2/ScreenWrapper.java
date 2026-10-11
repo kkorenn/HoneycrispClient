@@ -1,0 +1,115 @@
+package dev.honeycrisp.v1_12_2;
+
+import dev.honeycrisp.Honeycrisp;
+import dev.honeycrisp.platform.Keys;
+import dev.honeycrisp.ui.Screen;
+import net.minecraft.client.gui.GuiScreen;
+import org.lwjgl.input.Keyboard;
+import org.lwjgl.input.Mouse;
+
+import java.io.IOException;
+
+/** Forwards a vanilla GuiScreen's rendering and input to a core Screen, in float GUI coordinates. */
+final class ScreenWrapper extends GuiScreen {
+	final Screen screen;
+	private float lastX, lastY;
+
+	ScreenWrapper(Screen screen) {
+		this.screen = screen;
+	}
+
+	private float mouseX() {
+		return Mouse.getEventX() * width / (float)mc.displayWidth;
+	}
+
+	private float mouseY() {
+		return height - Mouse.getEventY() * height / (float)mc.displayHeight - 1;
+	}
+
+	@Override
+	public void initGui() {
+		Keyboard.enableRepeatEvents(true);
+		screen.init(width, height);
+	}
+
+	@Override
+	public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+		if (!screen.transparentBackground() || mc.world == null) {
+			drawDefaultBackground();
+		}
+		float x = Mouse.getX() * width / (float)mc.displayWidth;
+		float y = height - Mouse.getY() * height / (float)mc.displayHeight - 1;
+		screen.render(Honeycrisp.platform().renderer(), x, y, partialTicks);
+	}
+
+	@Override
+	protected void mouseClicked(int mouseX, int mouseY, int button) {
+		lastX = mouseX();
+		lastY = mouseY();
+		screen.mouseClicked(lastX, lastY, button);
+	}
+
+	@Override
+	protected void mouseReleased(int mouseX, int mouseY, int button) {
+		screen.mouseReleased(mouseX(), mouseY(), button);
+	}
+
+	@Override
+	protected void mouseClickMove(int mouseX, int mouseY, int button, long time) {
+		float x = mouseX(), y = mouseY();
+		screen.mouseDragged(x, y, button, x - lastX, y - lastY);
+		lastX = x;
+		lastY = y;
+	}
+
+	@Override
+	public void handleMouseInput() throws IOException {
+		super.handleMouseInput();
+		int wheel = Mouse.getEventDWheel();
+		if (wheel != 0) {
+			screen.mouseScrolled(mouseX(), mouseY(), Math.signum(wheel));
+		}
+	}
+
+	@Override
+	protected void keyTyped(char c, int keyCode) {
+		int key = KeyMap.toGlfw(keyCode);
+		if (key != Keys.UNKNOWN && screen.keyPressed(key, modifiers())) {
+			return;
+		}
+		if (c >= ' ' && c != 127 && screen.charTyped(c)) {
+			return;
+		}
+		if (keyCode == Keyboard.KEY_ESCAPE) {
+			mc.displayGuiScreen(null);
+		}
+	}
+
+	private static int modifiers() {
+		int m = 0;
+		if (Keyboard.isKeyDown(Keyboard.KEY_LSHIFT) || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT)) {
+			m |= 1;
+		}
+		if (Keyboard.isKeyDown(Keyboard.KEY_LCONTROL) || Keyboard.isKeyDown(Keyboard.KEY_RCONTROL)) {
+			m |= 2;
+		}
+		if (Keyboard.isKeyDown(Keyboard.KEY_LMENU) || Keyboard.isKeyDown(Keyboard.KEY_RMENU)) {
+			m |= 4;
+		}
+		if (Keyboard.isKeyDown(Keyboard.KEY_LMETA) || Keyboard.isKeyDown(Keyboard.KEY_RMETA)) {
+			m |= 8;
+		}
+		return m;
+	}
+
+	@Override
+	public void onGuiClosed() {
+		Keyboard.enableRepeatEvents(false);
+		screen.onClose();
+	}
+
+	@Override
+	public boolean doesGuiPauseGame() {
+		return screen.pausesGame();
+	}
+}

@@ -1,0 +1,10 @@
+{
+	"required": true,
+	"package": "dev.honeycrisp.v26_2.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"CameraMixin", "ChatComponentMixin", "ClientClockManagerMixin", "GuiGraphicsExtractorInvoker", "GuiMixin", "HudMixin", "KeyboardHandlerMixin", "KeyboardInputMixin",
+		"LightmapMixin", "MinecraftMixin", "MouseHandlerMixin", "OverlayTextureAccessor"
+	],
+	"injectors": { "defaultRequire": 1 }
+}

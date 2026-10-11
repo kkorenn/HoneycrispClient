@@ -11,6 +11,21 @@ Honeycrisp Client has three parts:
 > **NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.**
 > Honeycrisp Client is an independent project and is not affiliated with Apple Inc.
 
+## Status: use the mod jars for now
+
+The launcher's Microsoft sign-in is **waiting for Mojang to approve its app ID**. Until then the launcher can only start the game in offline mode (singleplayer). Microsoft sign-in, and so online servers, won't work in it yet.
+
+To play online today, use the mod jars with a launcher you already sign in with, such as Modrinth App, Prism Launcher or the official Minecraft Launcher:
+
+1. Create an instance for your Minecraft version with **Fabric** (1.21.5+, 26.x) or **Forge** (1.7.10, 1.8.9, 1.12.2).
+2. Download from the Releases pages and put into the instance's `mods` folder:
+   - `graft-<version>.jar` from [Graft](https://github.com/kkorenn/Graft/releases) (required: the Metal renderer)
+   - `honeycrisp-<version>.jar` from [this repo's releases](https://github.com/kkorenn/HoneycrispClient/releases)
+   - optional, for shader packs: `graftshaders-…+mc<version>.jar` from [Graft Shaders](https://github.com/kkorenn/GraftShaders/releases), plus [Sodium](https://modrinth.com/mod/sodium)
+3. Start the game and press **Right Shift** for the mod menu.
+
+For 1.7.10, 1.8.9 and 1.12.2 use Modrinth App or Prism Launcher: they run these versions natively on Apple Silicon.
+
 ## Supported Minecraft versions
 
 | Loader | Versions |
@@ -67,3 +82,7 @@ cd launcher && make app        # → launcher/build/Honeycrisp.app
 - Graft Shaders is based on [Iris](https://github.com/IrisShaders/Iris) (LGPL-3.0).
 - Works with [Sodium](https://github.com/CaffeineMC/sodium) on Fabric.
 - Native libraries for legacy versions on Apple Silicon come from the [MinecraftMachina](https://github.com/MinecraftMachina) builds, the same ones Prism Launcher and the Modrinth App use.
+
+## License
+
+LGPL-3.0. See [LICENSE](LICENSE).

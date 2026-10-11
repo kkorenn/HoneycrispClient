@@ -1,0 +1,5 @@
+{"latest": {"release": "1.21.11", "snapshot": "26.3"},
+ "versions": [
+  {"id": "26.3", "type": "release", "url": "https://piston-meta.mojang.com/v1/packages/abc/26.3.json", "time": "2026-09-01T10:00:00+00:00", "releaseTime": "2026-09-01T10:00:00+00:00", "sha1": "abc", "complianceLevel": 1},
+  {"id": "1.8.9", "type": "release", "url": "https://piston-meta.mojang.com/v1/packages/def/1.8.9.json", "time": "2015-12-03T09:24:39+00:00", "releaseTime": "2015-12-03T09:24:39+00:00", "sha1": "def", "complianceLevel": 0}
+ ]}

@@ -1,0 +1,30 @@
+plugins { id 'net.fabricmc.fabric-loom-remap' version "${loom_version}" }
+
+base.archivesName = 'honeycrisp-1.21.9'
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+dependencies {
+	minecraft "com.mojang:minecraft:1.21.9"
+	mappings loom.officialMojangMappings()
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation project(':core')
+}
+
+// Shared sources: mc1_21_common (all 1.21.5–1.21.10), mc1_21_6_10 (deferred GuiRenderState GUI; 1.21.5 has its own
+// immediate-mode renderer in src/), mc1_21_5_8 / mc1_21_9_10 (raw GLFW input args vs 1.21.9's KeyEvent/MouseButtonEvent).
+sourceSets.main {
+	for (String dir : ['../mc1_21_common', '../mc1_21_6_10', '../mc1_21_9_10']) {
+		java.srcDir "${dir}/src/main/java"
+		resources.srcDir "${dir}/src/main/resources"
+	}
+}
+
+// core classes + resources (natives/) ship inside this jar.
+evaluationDependsOn(':core')
+jar { from(project(':core').sourceSets.main.output) }
+
+processResources {
+	def version = project.version
+	inputs.property "version", version
+	filesMatching("fabric.mod.json") { expand "version": version }
+}

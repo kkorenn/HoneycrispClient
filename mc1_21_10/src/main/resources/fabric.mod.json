@@ -1,0 +1,12 @@
+{
+	"schemaVersion": 1,
+	"id": "honeycrisp",
+	"version": "${version}",
+	"name": "Honeycrisp Client",
+	"description": "Lunar-style client for Apple Silicon Macs, rendered through Graft.",
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": { "client": ["dev.honeycrisp.v1_21.HoneycrispMod"] },
+	"mixins": ["honeycrisp.mixins.json"],
+	"depends": { "fabricloader": ">=0.19.5", "minecraft": "1.21.10", "java": ">=25", "graft": "*" }
+}

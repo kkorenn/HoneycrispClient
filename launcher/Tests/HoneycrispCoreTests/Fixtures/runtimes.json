@@ -1,0 +1,9 @@
+{
+ "gamecore": {},
+ "mac-os-arm64": {
+  "java-runtime-delta": [{"availability": {"group": 1, "progress": 100}, "manifest": {"sha1": "d", "size": 1, "url": "https://x/d.json"}, "version": {"name": "21.0.7", "released": "2025-04-01T00:00:00+00:00"}}],
+  "java-runtime-epsilon": [{"availability": {"group": 1, "progress": 100}, "manifest": {"sha1": "e", "size": 1, "url": "https://x/e.json"}, "version": {"name": "25.0.1", "released": "2025-10-01T00:00:00+00:00"}}],
+  "jre-legacy": [{"availability": {"group": 1, "progress": 100}, "manifest": {"sha1": "l", "size": 1, "url": "https://x/l.json"}, "version": {"name": "8u462", "released": "2025-07-01T00:00:00+00:00"}}],
+  "minecraft-java-exe": []
+ }
+}

@@ -1,0 +1,21 @@
+{
+  "url": "https://api.github.com/repos/kkorenn/Graft/releases/1",
+  "tag_name": "v1.0.0",
+  "name": "Graft 1.0.0",
+  "draft": false,
+  "prerelease": false,
+  "assets": [
+    {"name": "graftshaders-1.21.11-1.0.0.jar", "size": 2048, "digest": "sha256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "content_type": "application/java-archive",
+     "browser_download_url": "https://github.com/kkorenn/Graft/releases/download/v1.0.0/graftshaders-1.21.11-1.0.0.jar"},
+    {"name": "graft-1.21.11-1.0.0.jar", "size": 5, "digest": "sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", "content_type": "application/java-archive",
+     "browser_download_url": "https://github.com/kkorenn/Graft/releases/download/v1.0.0/graft-1.21.11-1.0.0.jar"},
+    {"name": "graft-1.21.1-1.0.0.jar", "size": 1, "digest": null,
+     "browser_download_url": "https://github.com/kkorenn/Graft/releases/download/v1.0.0/graft-1.21.1-1.0.0.jar"},
+    {"name": "graft-26.3-1.0.0-sources.jar", "size": 1,
+     "browser_download_url": "https://github.com/kkorenn/Graft/releases/download/v1.0.0/graft-26.3-1.0.0-sources.jar"},
+    {"name": "graft-26.3-1.0.0.jar", "size": 4096,
+     "browser_download_url": "https://github.com/kkorenn/Graft/releases/download/v1.0.0/graft-26.3-1.0.0.jar"},
+    {"name": "graft-1.8.9-1.0.0.jar.sha256", "size": 64, "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+     "browser_download_url": "https://github.com/kkorenn/Graft/releases/download/v1.0.0/graft-1.8.9-1.0.0.jar.sha256"}
+  ]
+}

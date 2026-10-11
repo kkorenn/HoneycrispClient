@@ -1,0 +1,16 @@
+{
+  "id": "7pwil2dy",
+  "project_id": "AANobbMI",
+  "version_number": "mc1.21.8-0.7.3-fabric",
+  "version_type": "release",
+  "game_versions": ["1.21.6", "1.21.7", "1.21.8"],
+  "loaders": ["fabric"],
+  "files": [
+    {"url": "https://cdn.modrinth.com/data/AANobbMI/versions/7pwil2dy/sodium-fabric-0.7.3%2Bmc1.21.8-sources.jar", "filename": "sodium-fabric-0.7.3+mc1.21.8-sources.jar",
+     "primary": false, "size": 9, "hashes": {"sha1": "x", "sha512": "y"}},
+    {"url": "https://cdn.modrinth.com/data/AANobbMI/versions/7pwil2dy/sodium-fabric-0.7.3%2Bmc1.21.8.jar", "filename": "sodium-fabric-0.7.3+mc1.21.8.jar",
+     "primary": true, "size": 5,
+     "hashes": {"sha1": "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d",
+                "sha512": "9b71d224bd62f3785d96d46ad3ea3d73319bfbc2890caadae2dff72519673ca72323c3d99ba5c11d7c7acc6e14b8c5da0c4663475c2e5c3adef46f73bcdec043"}}
+  ]
+}

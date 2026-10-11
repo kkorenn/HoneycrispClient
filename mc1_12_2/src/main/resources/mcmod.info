@@ -1,0 +1,9 @@
+[{
+	"modid": "honeycrisp",
+	"name": "Honeycrisp Client",
+	"description": "HUD mods, zoom, freelook and PvP tweaks for Graft.",
+	"version": "${version}",
+	"mcversion": "1.12.2",
+	"requiredMods": ["graft"],
+	"dependencies": ["graft"]
+}]

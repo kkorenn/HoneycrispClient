@@ -1,0 +1,30 @@
+plugins { id 'java-library' }
+repositories { mavenCentral() }
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+// Bytecode 8: the same core jar loads on 1.7.10/1.8.9/1.12.2 (Java 8) and 1.21.x/26.x (Java 21/25).
+tasks.withType(JavaCompile).configureEach { options.release = 8; options.encoding = 'UTF-8' }
+tasks.named('compileTestJava') { options.release = 25 }
+dependencies {
+	testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+test {
+	useJUnitPlatform()
+	systemProperty 'java.awt.headless', 'true'
+	jvmArgs '--enable-native-access=ALL-UNNAMED'
+}
+
+// libhoneycrisp.dylib (arm64, macOS 12+): CoreText text, SF Symbols, shapes. Packed into the jar at natives/.
+def nativeOut = layout.buildDirectory.dir('native')
+def compileNative = tasks.register('compileNative', Exec) {
+	def src = file('src/main/native/honeycrisp.m')
+	def out = nativeOut.get().file('natives/libhoneycrisp.dylib').asFile
+	def jdk = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }.get().metadata.installationPath.asFile
+	inputs.file src
+	outputs.file out
+	doFirst { out.parentFile.mkdirs() }
+	commandLine 'clang', '-arch', 'arm64', '-mmacosx-version-min=12', '-O2', '-Wall', '-dynamiclib', '-fobjc-arc',
+		"-I${jdk}/include", "-I${jdk}/include/darwin", '-framework', 'AppKit', '-framework', 'CoreText',
+		'-framework', 'CoreGraphics', '-o', out.absolutePath, src.absolutePath
+}
+sourceSets.main.resources.srcDir(files(nativeOut).builtBy(compileNative))
