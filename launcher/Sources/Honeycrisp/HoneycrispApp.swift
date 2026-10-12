@@ -8,23 +8,15 @@ struct HoneycrispApp: App {
     var body: some Scene {
         Window("Honeycrisp", id: "main") {
             RootView()
+                .background(WindowChrome())
                 .environment(model)
                 .frame(minWidth: Theme.windowMin.width, minHeight: Theme.windowMin.height)
                 .tint(model.settings.accent.color)
                 .preferredColorScheme(model.settings.appearance.scheme)
         }
         .defaultSize(Theme.windowDefault)
-        .windowToolbarStyle(.unified(showsTitle: false))
+        .windowStyle(.hiddenTitleBar)
         .commands { LauncherCommands(model: model) }
-
-        Window("Game Log", id: "log") {
-            LogView()
-                .environment(model)
-                .tint(model.settings.accent.color)
-                .preferredColorScheme(model.settings.appearance.scheme)
-        }
-        .defaultSize(width: 900, height: 560)
-        .keyboardShortcut("l", modifiers: [.command])
     }
 }
 
@@ -48,6 +40,9 @@ struct LauncherCommands: Commands {
                     .keyboardShortcut(KeyEquivalent(Character("\(i + 1)")), modifiers: .command)
             }
             Divider()
+            Button(model.sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar") { model.sidebarCollapsed.toggle() }
+                .keyboardShortcut("s", modifiers: [.command, .control])
+            Divider()
         }
         CommandMenu("Game") {
             Button(model.status(model.spec) == .ready ? "Play" : "Install and Play") { model.play() }
@@ -66,7 +61,7 @@ struct LauncherCommands: Commands {
             Divider()
             Button("Open Game Folder") { model.openGameFolder() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
-            Button("Account…") { model.selection = model.selection ?? .home; model.showAccount = true }
+            Button("Accounts…") { model.showAccount = true }
                 .keyboardShortcut("a", modifiers: [.command, .shift])
         }
     }

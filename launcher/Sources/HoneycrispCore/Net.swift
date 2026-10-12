@@ -154,6 +154,7 @@ public enum Downloader {
                 if attempt > 0 { try await Task.sleep(for: .milliseconds(500 * attempt)) }
                 do {
                     let (tmp, resp) = try await HTTP.session.download(from: url)
+                    defer { try? fm.removeItem(at: tmp) }
                     let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
                     if status == 404 { lastError = "404"; break }   // try the next mirror
                     guard (200..<300).contains(status) else { lastError = "HTTP \(status)"; continue }

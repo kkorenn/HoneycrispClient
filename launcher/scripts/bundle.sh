@@ -3,7 +3,7 @@
 # Usage: scripts/bundle.sh [client-id]   (client ID also settable later in Settings)
 set -euo pipefail
 cd "${0:A:h}/.."
-VERSION="${VERSION:-1.0.0}"
+VERSION="${VERSION:-0.2.0}"
 CLIENT_ID="${1:-${MC_CLIENT_ID:-}}"
 APP=build/Honeycrisp.app
 
@@ -14,11 +14,11 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Honeycrisp"
 
-# Placeholder icon (skipped quietly if it can't be drawn).
+# App icon: AppIconView (Sources/Honeycrisp/Logo.swift) rendered by scripts/make-icon.swift; redrawn when either changes.
 ICONSET=build/AppIcon.iconset
-if [[ ! -f build/AppIcon.icns ]]; then
+if [[ ! -f build/AppIcon.icns || scripts/make-icon.swift -nt build/AppIcon.icns || Sources/Honeycrisp/Logo.swift -nt build/AppIcon.icns ]]; then
   rm -rf "$ICONSET"; mkdir -p "$ICONSET"
-  if swift scripts/make-icon.swift build/icon-1024.png 2>/dev/null; then
+  if swiftc -O -parse-as-library scripts/make-icon.swift Sources/Honeycrisp/Logo.swift -o build/make-icon && build/make-icon build/icon-1024.png; then
     for s in 16 32 128 256 512; do
       sips -z $s $s build/icon-1024.png --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
       sips -z $((s*2)) $((s*2)) build/icon-1024.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
@@ -27,6 +27,17 @@ if [[ ! -f build/AppIcon.icns ]]; then
   fi
 fi
 [[ -f build/AppIcon.icns ]] && cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+
+# Game icon: the running game's Dock icon ("Honeycrisp Client", see AppModel.gameIdentity), from Resources/game-icon.png.
+if [[ ! -f build/GameIcon.icns || Resources/game-icon.png -nt build/GameIcon.icns ]]; then
+  GSET=build/GameIcon.iconset; rm -rf "$GSET"; mkdir -p "$GSET"
+  for s in 16 32 128 256 512; do
+    sips -z $s $s Resources/game-icon.png --out "$GSET/icon_${s}x${s}.png" >/dev/null
+    sips -z $((s*2)) $((s*2)) Resources/game-icon.png --out "$GSET/icon_${s}x${s}@2x.png" >/dev/null
+  done
+  iconutil -c icns "$GSET" -o build/GameIcon.icns
+fi
+cp build/GameIcon.icns "$APP/Contents/Resources/GameIcon.icns"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

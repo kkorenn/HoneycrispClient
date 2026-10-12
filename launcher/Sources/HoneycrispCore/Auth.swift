@@ -1,6 +1,5 @@
 import CryptoKit
 import Foundation
-import Security
 
 public struct Account: Codable, Sendable, Equatable {
     public enum Kind: String, Codable, Sendable { case microsoft, offline }
@@ -48,6 +47,7 @@ public enum AuthError: LocalizedError, Equatable {
     case noProfile
     case cancelled
     case deviceCodeExpired
+    case sessionExpired
 
     public var errorDescription: String? {
         switch self {
@@ -60,6 +60,7 @@ public enum AuthError: LocalizedError, Equatable {
         case .noProfile: "No Minecraft profile yet. Pick a name at minecraft.net first."
         case .cancelled: "Sign-in cancelled."
         case .deviceCodeExpired: "The sign-in code expired. Try again."
+        case .sessionExpired: "Microsoft session expired. Sign in again."
         }
     }
 }
@@ -110,7 +111,7 @@ public struct MicrosoftAuth: Sendable {
     }
 
     public func refresh(_ account: Account) async throws -> Account {
-        guard let rt = account.msRefreshToken else { throw AuthError.cancelled }
+        guard let rt = account.msRefreshToken else { throw AuthError.sessionExpired }
         let t: TokenResponse = try await HTTP.postForm(URL(string: "\(Self.oauth)/token")!, [
             "client_id": clientID, "grant_type": "refresh_token", "refresh_token": rt, "scope": Self.scope,
         ])
@@ -219,7 +220,7 @@ public struct MicrosoftAuth: Sendable {
     }
 }
 
-/// Saved accounts (several, one active), kept in the login keychain as one generic-password item.
+/// Saved accounts (several, one active), kept in Application Support/Honeycrisp/accounts.json (0600).
 public struct AccountStore: Codable, Sendable, Equatable {
     public var accounts: [Account] = []
     public var activeUUID: String?
@@ -233,27 +234,25 @@ public struct AccountStore: Codable, Sendable, Equatable {
     }
 }
 
-public enum Keychain {
-    static let service = "dev.honeycrisp.launcher"
-    static let key = "accounts"
+public enum AccountFile {
+    static var url: URL { Paths().root.appending(path: "accounts.json") }
 
     public static func load() -> AccountStore {
-        var out: CFTypeRef?
-        let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
-                                kSecAttrAccount as String: key, kSecReturnData as String: true]
-        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let d = out as? Data,
-              let s = try? JSONDecoder().decode(AccountStore.self, from: d) else { return AccountStore() }
+        guard let d = try? Data(contentsOf: url), let s = try? JSONDecoder().decode(AccountStore.self, from: d) else { return AccountStore() }
         return s
     }
 
+    /// Writes atomically, readable and writable by the user only (0600).
     @discardableResult
     public static func save(_ store: AccountStore) -> Bool {
-        let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: key]
         guard let d = try? JSONEncoder().encode(store) else { return false }
-        if SecItemUpdate(q as CFDictionary, [kSecValueData as String: d] as CFDictionary) == errSecSuccess { return true }
-        var add = q
-        add[kSecValueData as String] = d
-        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-        return SecItemAdd(add as CFDictionary, nil) == errSecSuccess
+        do {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try d.write(to: url, options: .atomic)
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+            return true
+        } catch {
+            return false
+        }
     }
 }

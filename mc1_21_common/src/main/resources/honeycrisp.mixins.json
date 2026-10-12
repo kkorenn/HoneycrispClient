@@ -4,7 +4,7 @@
 	"compatibilityLevel": "JAVA_21",
 	"client": [
 		"CameraMixin", "ChatComponentMixin", "ClientLevelDataMixin", "ClientLevelMixin", "GameRendererMixin", "GuiGraphicsAccess", "HudMixin",
-		"KeyboardHandlerMixin", "KeyboardInputMixin", "LightTextureMixin", "MinecraftMixin", "MouseButtonMixin", "MouseHandlerMixin", "OverlayTextureAccessor", "ScoreboardMixin"
+		"KeyboardHandlerMixin", "MacosUtilMixin", "KeyboardInputMixin", "LightTextureMixin", "MinecraftMixin", "MouseButtonMixin", "MouseHandlerMixin", "OverlayTextureAccessor", "ScoreboardMixin"
 	],
 	"injectors": { "defaultRequire": 1 }
 }

@@ -14,7 +14,7 @@ struct LauncherSettings: Codable, Equatable {
     var sodium = true
     var keepLauncherOpen = true
     var appearance = Appearance.system
-    var accent = Theme.Accent.system
+    var accent = Theme.Accent.honeycrisp
     var windowWidth = 0          // 0 = game default
     var windowHeight = 0
     var lastVersion = Catalog.instances[0].mc
@@ -27,14 +27,15 @@ struct LauncherSettings: Codable, Equatable {
 }
 
 enum SidebarItem: String, CaseIterable, Identifiable {
-    case home = "Home", versions = "Versions", mods = "Mods", settings = "Settings"
+    case home = "Home", versions = "Versions", mods = "Mods", log = "Game Log", settings = "Settings"
     var id: Self { self }
     var symbol: String {
         switch self {
-        case .home: "house"
-        case .versions: "square.stack.3d.up"
-        case .mods: "puzzlepiece.extension"
-        case .settings: "gearshape"
+        case .home: "house.fill"
+        case .versions: "square.stack.3d.up.fill"
+        case .mods: "puzzlepiece.extension.fill"
+        case .log: "text.alignleft"
+        case .settings: "gearshape.fill"
         }
     }
 }
@@ -52,19 +53,22 @@ enum ClientIDState { case missing, notApproved, unknown, approved }
 
 @MainActor @Observable
 final class AppModel {
-    var settings = LauncherSettings.load() { didSet { if settings != oldValue { settings.save(); statusTick += 1 } } }
+    var settings: LauncherSettings { didSet { if settings != oldValue { if !isPreview { settings.save() }; statusTick += 1 } } }
     var selection: SidebarItem? = .home
+    var sidebarCollapsed = false
+    /// When each running install started, for the Play bar's time-left estimate.
+    var workStarted: [String: Date] = [:]
     var phase: [String: Phase] = [:]
     var runningVersion: String?
     var log: [String] = []
     var crashReport: String?
     var banner: String?
     var installWarnings: [String] = []
-    var store = Keychain.load()
+    var store: AccountStore
     var showAccount = false
     var news: [VersionManifest.Entry] = []
-    var clientApproved: Bool? = UserDefaults.standard.object(forKey: "clientApproved") as? Bool {
-        didSet { UserDefaults.standard.set(clientApproved, forKey: "clientApproved") }
+    var clientApproved: Bool? {
+        didSet { if !isPreview { UserDefaults.standard.set(clientApproved, forKey: "clientApproved") } }
     }
     /// Bumped to make views re-read on-disk state (install stamps, mod folders).
     var statusTick = 0
@@ -73,10 +77,31 @@ final class AppModel {
     var releaseWarning: String?
     var checkingReleases = false
 
-    let installer = Installer()
+    let installer: Installer
+    /// Snapshot/preview model: never reads or writes UserDefaults or the account file, never touches the network.
+    let isPreview: Bool
+
+    init() {
+        installer = Installer()
+        isPreview = false
+        settings = LauncherSettings.load()
+        store = AccountFile.load()
+        clientApproved = UserDefaults.standard.object(forKey: "clientApproved") as? Bool
+    }
+
+    init(previewPaths: Paths, settings: LauncherSettings, store: AccountStore, clientApproved: Bool?) {
+        installer = Installer(paths: previewPaths)
+        isPreview = true
+        self.settings = settings
+        self.store = store
+        self.clientApproved = clientApproved
+    }
     var paths: Paths { installer.paths }
-    @ObservationIgnored private var process: Process?
+    /// The running game: the "Honeycrisp Client" stub app (which runs Java), its log pipe and exit watcher.
+    @ObservationIgnored private var game: (app: NSRunningApplication, log: FileHandle, watch: NSKeyValueObservation)?
     @ObservationIgnored private var task: Task<Void, Never>?
+    /// Set by Stop so the exit (SIGTERM / 143) isn't reported as a crash.
+    @ObservationIgnored private var stopRequested = false
 
     var account: Account? { store.active }
 
@@ -113,7 +138,7 @@ final class AppModel {
 
     /// Network check for newer Graft / Graft Shaders / Honeycrisp releases. Failures (offline, rate limit) only warn.
     func refreshReleases(force: Bool = false) async {
-        guard !checkingReleases else { return }
+        guard !checkingReleases, !isPreview else { return }
         checkingReleases = true
         defer { checkingReleases = false; statusTick += 1 }
         if force { await GitHub.clearCache() }
@@ -135,18 +160,18 @@ final class AppModel {
 
     func saveAccount(_ a: Account) {
         store.upsert(a)
-        Keychain.save(store)
+        if !isPreview { AccountFile.save(store) }
     }
 
     func select(_ a: Account) {
         store.activeUUID = a.uuid
-        Keychain.save(store)
+        if !isPreview { AccountFile.save(store) }
     }
 
     func signOut(_ a: Account) {
         store.accounts.removeAll { $0.uuid == a.uuid }
         if store.activeUUID == a.uuid { store.activeUUID = store.accounts.first?.uuid }
-        Keychain.save(store)
+        if !isPreview { AccountFile.save(store) }
     }
 
     /// Records the outcome so the UI can say "Client ID not approved yet" instead of a raw 403.
@@ -172,7 +197,8 @@ final class AppModel {
 
     func install(_ s: InstanceSpec) async -> Bool {
         phase[s.mc] = .working(0, "Preparing…")
-        defer { if case .working = phase[s.mc] { phase[s.mc] = .idle }; statusTick += 1 }
+        workStarted[s.mc] = Date()
+        defer { if case .working = phase[s.mc] { phase[s.mc] = .idle }; workStarted[s.mc] = nil; statusTick += 1 }
         do {
             let stamp = try await installer.install(s, options) { [weak self] f, m in
                 Task { @MainActor in
@@ -221,31 +247,107 @@ final class AppModel {
         if w > 0, h > 0 { c.windowSize = (w, h) }
         let argv = try LaunchCommand.build(p.version, c)
 
-        let proc = Process()
-        proc.executableURL = URL(filePath: argv[0])
-        proc.arguments = Array(argv.dropFirst())
-        proc.currentDirectoryURL = paths.instance(s.mc)
-        let pipe = Pipe()
-        proc.standardOutput = pipe
-        proc.standardError = pipe
+        // macOS ties a process to the app that spawned it, so Java started here would show up as "Honeycrisp" (one
+        // merged Dock icon). Instead LaunchServices opens the stub "Honeycrisp Client.app", whose script runs Java:
+        // the game gets that name and icon. The script execs Java (one process, one Dock icon); output comes back through
+        // a FIFO.
+        let run = paths.root.appending(path: "run")
+        try FileManager.default.createDirectory(at: run, withIntermediateDirectories: true)
+        let fifo = run.appending(path: "game.log")
+        try? FileManager.default.removeItem(at: fifo)
+        guard mkfifo(fifo.path, 0o600) == 0, let pipe = FileHandle(forUpdatingAtPath: fifo.path) else {
+            throw CocoaError(.fileWriteUnknown, userInfo: [NSLocalizedDescriptionKey: "Couldn't create the game log pipe"])
+        }
+        let stub = try gameApp()
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+        config.arguments = [fifo.path, paths.instance(s.mc).path] + argv
+        var env = ProcessInfo.processInfo.environment
+        env["__CFBundleIdentifier"] = nil
+        env["XPC_SERVICE_NAME"] = nil
+        config.environment = env
+
         let started = Date()
         let lines = LineSplitter()
-        pipe.fileHandleForReading.readabilityHandler = { [weak self] h in
+        pipe.readabilityHandler = { [weak self] h in
             let out = lines.feed(h.availableData)
             guard !out.isEmpty else { return }
             Task { @MainActor in self?.appendLog(out) }
         }
-        proc.terminationHandler = { [weak self] p in
-            let code = p.terminationStatus
-            Task { @MainActor in self?.finished(s, code: code, started: started) }
-        }
-        log = ["$ " + argv.map { $0.contains(" ") ? "'\($0)'" : $0 }.joined(separator: " ")
-                    .replacingOccurrences(of: acct.accessToken, with: "<token>")]
+        let cmd = argv.map { $0.contains(" ") ? "'\($0)'" : $0 }.joined(separator: " ")
+        // Offline token is "0": redacting it would mangle every zero in the command line.
+        log = ["$ " + (acct.kind == .microsoft ? cmd.replacingOccurrences(of: acct.accessToken, with: "<token>") : cmd)]
         crashReport = nil
-        try proc.run()
-        process = proc
+        stopRequested = false
+        // Busy before the (multi-second) open, so Play can't start a second copy meanwhile.
         runningVersion = s.mc
-        if !settings.keepLauncherOpen { NSApp.hide(nil) }
+        let app: NSRunningApplication
+        do { app = try await NSWorkspace.shared.openApplication(at: stub, configuration: config) }
+        catch { pipe.readabilityHandler = nil; try? pipe.close(); runningVersion = nil; throw error }
+        // The game isn't our child, so there's no exit code: a crash is a crash report written during the run.
+        let game = paths.instance(s.mc)
+        let watch = app.observe(\.isTerminated, options: [.initial, .new]) { [weak self] app, _ in
+            guard app.isTerminated else { return }
+            Task { @MainActor in
+                let crashed = Self.newestCrashReport(in: game, since: started) != nil
+                self?.finished(s, code: crashed ? 1 : 0, signaled: false, started: started)
+            }
+        }
+        self.game = (app, pipe, watch)
+        bringToFront(app)
+    }
+
+    static let gameBundleID = "dev.honeycrisp.client"
+
+    /// The stub "Honeycrisp Client.app" (name, icon, and a script that runs Java), rewritten and registered with
+    /// LaunchServices before each launch so it always matches this launcher version.
+    private func gameApp() throws -> URL {
+        let bundle = paths.root.appending(path: "Honeycrisp Client.app")
+        let app = bundle.appending(path: "Contents")
+        let fm = FileManager.default
+        try fm.createDirectory(at: app.appending(path: "MacOS"), withIntermediateDirectories: true)
+        try fm.createDirectory(at: app.appending(path: "Resources"), withIntermediateDirectories: true)
+        let plist: [String: Any] = ["CFBundleIdentifier": Self.gameBundleID, "CFBundleName": "Honeycrisp Client",
+                                    "CFBundleDisplayName": "Honeycrisp Client", "CFBundleExecutable": "client",
+                                    "CFBundlePackageType": "APPL", "CFBundleIconFile": "GameIcon",
+                                    "CFBundleShortVersionString": Self.version, "LSMinimumSystemVersion": "14.0",
+                                    "NSHighResolutionCapable": true]
+        try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+            .write(to: app.appending(path: "Info.plist"))
+        let exe = app.appending(path: "MacOS/client")
+        try """
+        #!/bin/sh
+        # Honeycrisp Client: opened by the Honeycrisp launcher so the game gets this app's name and icon.
+        # Args: <log fifo> <game dir> <java> <java args...>. exec: Java takes over this process, so it is this app.
+        log="$1"; cd "$2" || exit 1; shift 2
+        exec "$@" >"$log" 2>&1 </dev/null
+
+        """.write(to: exe, atomically: true, encoding: .utf8)
+        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: exe.path)
+        if let icon = Bundle.main.url(forResource: "GameIcon", withExtension: "icns") {
+            let dst = app.appending(path: "Resources/GameIcon.icns")
+            try? fm.removeItem(at: dst)
+            try fm.copyItem(at: icon, to: dst)
+        }
+        LSRegisterURL(bundle as CFURL, true)
+        return bundle
+    }
+
+    /// Hand focus to the game once its window exists. macOS (14+) won't let a background process activate itself, and
+    /// hiding the launcher before the window existed left the game behind every other app. The launcher is frontmost
+    /// (the user just pressed Play), so it can yield activation to the game.
+    private func bringToFront(_ app: NSRunningApplication) {
+        Task { @MainActor [weak self] in
+            for _ in 0..<240 {  // ponytail: polls up to 2 minutes for the window; a slow modpack start just stays behind.
+                try? await Task.sleep(for: .milliseconds(500))
+                guard !app.isTerminated else { return }
+                guard app.activationPolicy == .regular else { continue }
+                NSApp.yieldActivation(to: app)
+                app.activate()
+                if self?.settings.keepLauncherOpen == false { NSApp.hide(nil) }
+                return
+            }
+        }
     }
 
     func appendLog(_ lines: [String]) {
@@ -253,13 +355,17 @@ final class AppModel {
         if log.count > 20_000 { log.removeFirst(log.count - 20_000) }
     }
 
-    private func finished(_ s: InstanceSpec, code: Int32, started: Date) {
-        (process?.standardOutput as? Pipe)?.fileHandleForReading.readabilityHandler = nil
-        process = nil
+    private func finished(_ s: InstanceSpec, code: Int32, signaled: Bool, started: Date) {
+        game?.log.readabilityHandler = nil
+        try? game?.log.close()
+        game?.watch.invalidate()
+        game = nil
         runningVersion = nil
-        guard code != 0 else { return }
+        let stopped = stopRequested
+        stopRequested = false
+        guard !Self.isNormalExit(code: code, signaled: signaled, stopRequested: stopped) else { return }
         crashReport = Self.newestCrashReport(in: paths.instance(s.mc), since: started)
-        banner = "Minecraft \(s.mc) exited with code \(code)."
+        banner = "Minecraft \(s.mc) crashed (exit code \(code))."
         NSApp.unhide(nil)
         NSApp.activate()
     }
@@ -278,15 +384,29 @@ final class AppModel {
         return newest.flatMap { try? String(contentsOf: $0.0, encoding: .utf8) }
     }
 
+    /// Quitting, Stop, Ctrl-C or SIGTERM (JVM exits 128+15 = 143, 128+2 = 130) are not crashes.
+    nonisolated static func isNormalExit(code: Int32, signaled: Bool, stopRequested: Bool) -> Bool {
+        code == 0 || stopRequested || [130, 143].contains(code) || (signaled && [2, 15].contains(code))
+    }
+
+    /// "About 2 min left", from elapsed time and the install fraction; nil until there is enough signal.
+    func timeLeft(_ mc: String, fraction f: Double) -> String? {
+        guard let start = workStarted[mc], f > 0.04, f < 1 else { return nil }
+        let left = Date().timeIntervalSince(start) / f * (1 - f)
+        if left < 60 { return "Less than a minute left" }
+        return "About \(Int((left / 60).rounded())) min left"
+    }
+
     func stop() {
-        process?.terminate()
+        stopRequested = game != nil
+        if let pid = game?.app.processIdentifier { kill(pid, SIGTERM) }  // the stub exec'd Java: this is the game
         task?.cancel()
     }
 
     // MARK: Misc
 
     func loadNews() async {
-        guard news.isEmpty, let d = try? await HTTP.data(URLRequest(url: Catalog.versionManifest)),
+        guard news.isEmpty, !isPreview, let d = try? await HTTP.data(URLRequest(url: Catalog.versionManifest)),
               let m = try? VersionManifest.decode(d) else { return }
         news = Array(m.versions.prefix(12))
     }

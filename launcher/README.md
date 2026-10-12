@@ -6,7 +6,8 @@ Native SwiftUI launcher for macOS 14+ on Apple Silicon (arm64 only). Swift Packa
 make build     # swift build -c release --arch arm64
 make test      # swift test: rules, libraries, arm64 overrides, Azul parsing, arguments, manifests, PKCE, offline UUID,
                # GitHub asset selection/digests/update check, pinned Sodium (fixtures, no network)
-make app       # → build/Honeycrisp.app (Info.plist, placeholder icon, ad-hoc codesign)
+make app       # → build/Honeycrisp.app (Info.plist, drawn app icon, ad-hoc codesign)
+make snapshots # offscreen PNGs of every screen, dark + light → build/snapshots/ (never opens a window)
 make app CLIENT_ID=<azure-application-id>   # bakes MCClientID into Info.plist
 ```
 
@@ -18,17 +19,20 @@ Sources/HoneycrispCore/       pure logic + networking (tested)
   VersionJSON.swift           version JSON model, rule evaluation, inheritsFrom merge, library resolution
   LaunchCommand.swift         JVM/game argument building, offline UUID
   Installer.swift             vanilla / Fabric / Forge / assets / Java runtime / mods install; launch prep
-  Auth.swift                  Microsoft → Xbox Live → XSTS → Minecraft, PKCE, device code, Keychain
+  Auth.swift                  Microsoft → Xbox Live → XSTS → Minecraft, PKCE, device code, account file
   Net.swift                   HTTP helpers, parallel SHA-1/SHA-256/SHA-512-verified downloader
   Releases.swift              GitHub latest releases: asset matching, digests, update check, session cache
   Catalog.swift               supported versions + pinned Sodium builds (edit here), URLs, on-disk paths
 Sources/Honeycrisp/           SwiftUI app
-  Theme.swift                 every look value (sizes, radii, accents, glass/material switches)
+  Theme.swift                 every look value: palette, spacing, radii, type, motion, Liquid Glass helpers (material fallback < 26)
+  Logo.swift                  the pixel-apple mark and the app icon view (make-icon.swift renders it)
+  Backdrop.swift              full-window animated mesh-gradient art + grain, hero art
   Model.swift                 AppModel: settings, Play state machine, process + log + crash detection
-  Views.swift                 window, sidebar, Home, Versions, Log
+  Views.swift                 window, glass sidebar, Home (hero, Play bar, release notes), Versions, Log
   ModsView.swift              per-instance mod jars (drag & drop) + Honeycrisp Client module switches
-  SettingsView.swift          Settings, Account popover
+  SettingsView.swift          Settings, Account sheet (device code + QR)
 Tests/HoneycrispCoreTests/    tests + Fixtures/*.json
+Tests/HoneycrispSnapshots/    offscreen screen renders from a mock model (temp data dir, no account file/UserDefaults/network)
 scripts/bundle.sh, make-icon.swift
 ```
 
@@ -122,8 +126,7 @@ Minecraft's login API only accepts Azure apps that Mojang has approved. Until th
 The flow: authorization code + PKCE in `ASWebAuthenticationSession` (ephemeral) → `login.microsoftonline.com/consumers` token →
 Xbox Live user token → XSTS (`rp://api.minecraftservices.com/`) → `login_with_xbox` → entitlement check
 (`game_minecraft`/`product_minecraft`) → profile. Accounts (including the Microsoft refresh token) are stored in
-the login Keychain (`dev.honeycrisp.launcher`). The Minecraft token is refreshed automatically before launch when it is within
-5 minutes of expiry. Because the app is ad-hoc signed, macOS may ask once for Keychain access after each rebuild.
+`~/Library/Application Support/Honeycrisp/accounts.json` (mode 0600). The Minecraft token is refreshed automatically before launch when it is within 5 minutes of expiry.
 
 ## Not verified yet (requires network or a real launch)
 

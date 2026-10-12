@@ -237,7 +237,9 @@ public final class HooksImpl implements Hooks {
 
 	@Override
 	public boolean replaceMainMenu() {
-		return client.customMainMenu.on() && Honeycrisp.screens().mainMenu != null;
+		// Without adapter MenuActions the custom menu has no Singleplayer/Multiplayer/Quit: keep vanilla's.
+		return client.customMainMenu.on() && Honeycrisp.screens().mainMenu != null
+				&& dev.honeycrisp.ui.screens.MenuActions.get() != null;
 	}
 
 	@Override

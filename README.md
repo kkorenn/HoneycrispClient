@@ -48,7 +48,7 @@ Requires a Mac with Apple Silicon (M1 or later) and macOS 14 or newer.
 The launcher uses Microsoft sign-in only to start Minecraft with the account you own.
 
 - You sign in on Microsoft's own page. The launcher never sees your password.
-- Tokens stay on your Mac, in the macOS Keychain. They are never sent anywhere except Microsoft, Xbox Live and Minecraft services.
+- Tokens stay on your Mac, in `~/Library/Application Support/Honeycrisp/accounts.json`, readable only by your user. They are never sent anywhere except Microsoft, Xbox Live and Minecraft services.
 - No analytics and no telemetry. The launcher has no Honeycrisp servers and talks only to:
   - Microsoft, Xbox Live and Minecraft services, to sign you in
   - Mojang, Fabric, Forge, Modrinth and Azul, to download the game, the loaders, mods and Java

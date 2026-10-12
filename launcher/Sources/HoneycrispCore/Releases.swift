@@ -50,6 +50,11 @@ public enum GitHub {
     public struct Release: Decodable, Sendable {
         public var tag_name: String
         public var assets: [Asset]
+        /// Release-notes fields for the launcher's What's New cards (display only).
+        public var name: String?
+        public var body: String?
+        public var published_at: String?
+        public var html_url: String?
 
         /// "<project>-<mc>-….jar": the trailing "-" keeps 1.21.1 off 1.21.10 and "graft-" off "graftshaders-".
         public func jar(_ p: Project, mc: String) -> Asset? {

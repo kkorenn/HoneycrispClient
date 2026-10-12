@@ -348,7 +348,8 @@ public actor Installer {
             }
             var files: [String: F]
         }
-        let files: Files = try await HTTP.get(URL(string: build.manifest.url)!)
+        guard let manifestURL = URL(string: build.manifest.url) else { throw URLError(.badURL) }
+        let files: Files = try await HTTP.get(manifestURL)
         let root = paths.runtimes.appending(path: comp)
         let fm = FileManager.default
         var items: [DownloadItem] = []
@@ -459,6 +460,10 @@ public actor Installer {
             }
         }
         var managed = jars.map(\.file)
+        // A failed Modrinth fetch must not delete the copy that's already installed.
+        func keepPrevious(_ prefix: String) {
+            managed += (previous?.managedMods ?? []).filter { $0.hasPrefix(prefix) }
+        }
 
         if spec.loader == .fabric {
             do {
@@ -467,6 +472,7 @@ public actor Installer {
                 managed.append(f.filename)
             } catch {
                 warnings.append("fabric-api: \(error.localizedDescription)")
+                keepPrevious("fabric-api-")
             }
             if let id = spec.sodium, wantsSodium(spec, o, jars: jars) {
                 do {
@@ -475,6 +481,7 @@ public actor Installer {
                     managed.append(f.filename)
                 } catch {
                     warnings.append("sodium: \(error.localizedDescription)")
+                    keepPrevious("sodium-")
                 }
             }
         }

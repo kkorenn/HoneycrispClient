@@ -8,5 +8,7 @@ let package = Package(
         .target(name: "HoneycrispCore"),
         .executableTarget(name: "Honeycrisp", dependencies: ["HoneycrispCore"]),
         .testTarget(name: "HoneycrispCoreTests", dependencies: ["HoneycrispCore"], resources: [.copy("Fixtures")]),
+        // Offscreen PNG renders of every screen (never shows a window): build/snapshots/*.png
+        .testTarget(name: "HoneycrispSnapshots", dependencies: ["Honeycrisp", "HoneycrispCore"]),
     ]
 )

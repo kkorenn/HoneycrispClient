@@ -82,7 +82,7 @@ public enum LaunchCommand {
             jvm = ["-Djava.library.path=\(c.nativesDir)", "-cp", classpath]
         }
         var head = ["-Xms512M", "-Xmx\(c.memoryMB)M", "-Dlog4j2.formatMsgNoLookups=true",
-                    "-Xdock:name=Minecraft", "-Dapple.awt.application.name=Minecraft"]
+                    "-Xdock:name=Honeycrisp Client", "-Dapple.awt.application.name=Honeycrisp Client", "-Dhoneycrisp.appIcon=true"]
         if let log = v.logging?["client"], let p = c.loggingConfigPath {
             head.append(log.argument.replacingOccurrences(of: "${path}", with: p))
         }

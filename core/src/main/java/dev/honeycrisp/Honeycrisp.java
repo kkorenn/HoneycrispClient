@@ -46,13 +46,18 @@ public final class Honeycrisp {
 		return SCREENS;
 	}
 
-	public static boolean initialized() {
-		return platform != null;
-	}
-
 	private static Hooks createHooks(Platform platform) {
 		modules = Features.createRegistry();
-		final Config c = config = new Config(platform.configDir().resolve("honeycrisp").resolve("config.json"), modules);
+		java.nio.file.Path file = platform.configDir().resolve("config.json");
+		// Older builds doubled the folder (config/honeycrisp/honeycrisp/config.json), where the launcher never looked.
+		java.nio.file.Path legacy = platform.configDir().resolve("honeycrisp").resolve("config.json");
+		if (!java.nio.file.Files.exists(file) && java.nio.file.Files.exists(legacy)) {
+			try {
+				java.nio.file.Files.move(legacy, file);
+			} catch (java.io.IOException ignored) {
+			}
+		}
+		final Config c = config = new Config(file, modules);
 		c.load();
 		Runtime.getRuntime().addShutdownHook(new Thread("Honeycrisp Client config save") {
 			@Override
