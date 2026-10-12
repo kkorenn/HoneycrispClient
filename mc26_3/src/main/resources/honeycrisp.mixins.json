@@ -3,7 +3,7 @@
 	"package": "dev.honeycrisp.v26_3.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
-		"CameraMixin", "ChatComponentMixin", "ClientClockInstanceMixin", "GuiGraphicsExtractorInvoker", "GuiMixin", "HudMixin", "KeyboardHandlerMixin", "MacosUtilMixin", "KeyboardInputMixin",
+		"CameraMixin", "ChatComponentMixin", "ClientClockInstanceMixin", "GuiGraphicsExtractorInvoker", "GuiMixin", "HudMixin", "KeyboardHandlerMixin", "WindowIconMixin", "KeyboardInputMixin",
 		"LightmapMixin", "MinecraftMixin", "MouseHandlerMixin", "OverlayTextureAccessor"
 	],
 	"injectors": { "defaultRequire": 1 }

@@ -3,7 +3,7 @@
 # Usage: scripts/bundle.sh [client-id]   (client ID also settable later in Settings)
 set -euo pipefail
 cd "${0:A:h}/.."
-VERSION="${VERSION:-0.2.0}"
+VERSION="${VERSION:-0.2.1}"
 CLIENT_ID="${1:-${MC_CLIENT_ID:-}}"
 APP=build/Honeycrisp.app
 

@@ -115,6 +115,11 @@ struct ModsView: View {
                     if model.checkingReleases { ProgressView().controlSize(.small) }
                     GlassButton(title: "Check for Updates", symbol: "arrow.clockwise") { Task { await model.refreshReleases(force: true) } }
                         .disabled(model.checkingReleases)
+                    let status = model.status(spec)
+                    if status != .ready {
+                        GlassButton(title: status == .notInstalled ? "Install" : "Update", symbol: "arrow.down") { Task { _ = await model.install(spec) } }
+                            .disabled(model.isBusy)
+                    }
                 }
             }
             let installed = model.installedJars(spec.mc)
