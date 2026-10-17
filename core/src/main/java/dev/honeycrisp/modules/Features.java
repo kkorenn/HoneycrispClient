@@ -20,6 +20,7 @@ public final class Features {
 		m.add(new ClockModule());
 		m.add(new ServerAddressModule());
 		m.add(new SpeedModule());
+		m.add(new DayCounterModule());
 		m.add(new ToggleSprintModule());
 		m.add(new ToggleSneakModule());
 		m.add(new OldAnimationsModule());

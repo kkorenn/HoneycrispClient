@@ -3,7 +3,20 @@ import HoneycrispCore
 import SwiftUI
 
 struct LauncherSettings: Codable, Equatable {
-    enum Appearance: String, Codable, CaseIterable { case system = "System", dark = "Dark", light = "Light" }
+    enum Appearance: String, Codable, CaseIterable {
+        case system = "System", dark = "Dark", light = "Light"
+
+        var configValue: String { rawValue.uppercased() }
+
+        init?(configValue: String) {
+            switch configValue.uppercased() {
+            case "SYSTEM": self = .system
+            case "DARK": self = .dark
+            case "LIGHT": self = .light
+            default: return nil
+            }
+        }
+    }
 
     var memoryMB = 4096
     var javaOverride = ""
@@ -24,6 +37,25 @@ struct LauncherSettings: Codable, Equatable {
         UserDefaults.standard.data(forKey: key).flatMap { try? JSONDecoder().decode(LauncherSettings.self, from: $0) } ?? LauncherSettings()
     }
     func save() { UserDefaults.standard.set(try? JSONEncoder().encode(self), forKey: Self.key) }
+}
+
+extension Theme.Accent {
+    var configValue: String { self == .honeycrisp ? "RED" : rawValue.uppercased() }
+
+    static func from(configValue: String, current: Theme.Accent = .honeycrisp) -> Theme.Accent? {
+        switch configValue.uppercased() {
+        case "SYSTEM": .system
+        case "BLUE": .blue
+        case "PURPLE": .purple
+        case "PINK": .pink
+        case "RED": current == .honeycrisp ? .honeycrisp : .red
+        case "ORANGE": .orange
+        case "YELLOW": .yellow
+        case "GREEN": .green
+        case "GRAPHITE": .graphite
+        default: nil
+        }
+    }
 }
 
 enum SidebarItem: String, CaseIterable, Identifiable {
@@ -53,7 +85,22 @@ enum ClientIDState { case missing, notApproved, unknown, approved }
 
 @MainActor @Observable
 final class AppModel {
-    var settings: LauncherSettings { didSet { if settings != oldValue { if !isPreview { settings.save() }; statusTick += 1 } } }
+    var settings: LauncherSettings {
+        didSet {
+            guard settings != oldValue else { return }
+            if !isPreview { settings.save() }
+            if !isSyncingUI, settings.appearance != oldValue.appearance || settings.accent != oldValue.accent {
+                syncUIToConfigs()
+            }
+            if settings.lastVersion != oldValue.lastVersion {
+                syncUIFromConfig(mc: settings.lastVersion)
+                if runningVersion == nil {
+                    loadDiskLogIfNeeded(for: settings.lastVersion)
+                }
+            }
+            statusTick &+= 1
+        }
+    }
     var selection: SidebarItem? = .home
     var sidebarCollapsed = false
     /// When each running install started, for the Play bar's time-left estimate.
@@ -61,8 +108,11 @@ final class AppModel {
     var phase: [String: Phase] = [:]
     var runningVersion: String?
     var log: [String] = []
+    var logIsFromDisk = false
     var crashReport: String?
+    var crashReportURL: URL?
     var banner: String?
+    var canOfferPlayOffline = false
     var installWarnings: [String] = []
     var store: AccountStore
     var showAccount = false
@@ -72,6 +122,8 @@ final class AppModel {
     }
     /// Bumped to make views re-read on-disk state (install stamps, mod folders).
     var statusTick = 0
+    /// Cached on-disk byte counts for installed instances.
+    var instanceSizes: [String: Int64] = [:]
     /// Latest GitHub releases, fetched on launch and on "Check for Updates", never per render.
     var releases: [GitHub.Project: GitHub.Release] = [:]
     var releaseWarning: String?
@@ -80,6 +132,8 @@ final class AppModel {
     let installer: Installer
     /// Snapshot/preview model: never reads or writes UserDefaults or the account file, never touches the network.
     let isPreview: Bool
+    @ObservationIgnored private var isSyncingUI = false
+    @ObservationIgnored private var diskLogVersion: String?
 
     init() {
         installer = Installer()
@@ -87,6 +141,8 @@ final class AppModel {
         settings = LauncherSettings.load()
         store = AccountFile.load()
         clientApproved = UserDefaults.standard.object(forKey: "clientApproved") as? Bool
+        syncUIFromConfig(mc: settings.lastVersion)
+        loadDiskLogIfNeeded(for: settings.lastVersion)
     }
 
     init(previewPaths: Paths, settings: LauncherSettings, store: AccountStore, clientApproved: Bool?) {
@@ -95,6 +151,8 @@ final class AppModel {
         self.settings = settings
         self.store = store
         self.clientApproved = clientApproved
+        syncUIFromConfig(mc: settings.lastVersion)
+        loadDiskLogIfNeeded(for: settings.lastVersion)
     }
     var paths: Paths { installer.paths }
     /// The running game: the "Honeycrisp Client" stub app (which runs Java), its log pipe and exit watcher.
@@ -123,6 +181,37 @@ final class AppModel {
                               sodium: settings.sodium, javaOverride: settings.javaOverride.isEmpty ? nil : settings.javaOverride)
     }
 
+    // MARK: - Appearance & Config Sync
+
+    /// Writes the launcher's current appearance and accent into the selected instance's config.json and any other
+    /// installed instances that already have a config.json.
+    func syncUIToConfigs() {
+        let theme = settings.appearance.configValue
+        let accent = settings.accent.configValue
+        let currentMC = spec.mc
+        for s in Catalog.instances {
+            let dir = paths.instance(s.mc)
+            var cfg = ModuleConfig(gameDir: dir)
+            if s.mc == currentMC || cfg.existsOnDisk {
+                cfg.setUI(theme: theme, accent: accent)
+            }
+        }
+    }
+
+    /// Reads the instance's config.json and updates launcher appearance/accent if changed in-game.
+    func syncUIFromConfig(mc: String) {
+        let cfg = ModuleConfig(gameDir: paths.instance(mc))
+        guard cfg.existsOnDisk else { return }
+        isSyncingUI = true
+        defer { isSyncingUI = false }
+        if let t = cfg.uiTheme, let app = LauncherSettings.Appearance(configValue: t), settings.appearance != app {
+            settings.appearance = app
+        }
+        if let a = cfg.uiAccent, let acc = Theme.Accent.from(configValue: a, current: settings.accent), settings.accent != acc {
+            settings.accent = acc
+        }
+    }
+
     func status(_ s: InstanceSpec) -> InstanceStatus {
         _ = statusTick
         guard let stamp = installer.stamp(s.mc) else { return .notInstalled }
@@ -140,7 +229,7 @@ final class AppModel {
     func refreshReleases(force: Bool = false) async {
         guard !checkingReleases, !isPreview else { return }
         checkingReleases = true
-        defer { checkingReleases = false; statusTick += 1 }
+        defer { checkingReleases = false; statusTick &+= 1 }
         if force { await GitHub.clearCache() }
         var problems: [String] = []
         for p in GitHub.Project.allCases {
@@ -155,6 +244,49 @@ final class AppModel {
     }
 
     var isBusy: Bool { runningVersion != nil || phase.values.contains { if case .working = $0 { true } else { false } } }
+
+    // MARK: - Instance Management
+
+    func instanceDiskBytes(_ s: InstanceSpec) -> Int64 {
+        _ = statusTick
+        if let cached = instanceSizes[s.mc] { return cached }
+        let bytes = Paths.directorySize(at: paths.instanceDir(s.id)) + Paths.directorySize(at: paths.versions.appending(path: s.id))
+        return bytes
+    }
+
+    func refreshInstanceSizes() {
+        let rootPaths = paths
+        let specs = Catalog.instances.filter { installer.stamp($0.mc) != nil }
+        Task.detached(priority: .utility) {
+            var sizes: [String: Int64] = [:]
+            for s in specs {
+                let instBytes = Paths.directorySize(at: rootPaths.instanceDir(s.id))
+                let verBytes = Paths.directorySize(at: rootPaths.versions.appending(path: s.id))
+                sizes[s.mc] = instBytes + verBytes
+            }
+            await MainActor.run { [weak self] in
+                self?.instanceSizes = sizes
+            }
+        }
+    }
+
+    func verifyAndRepair(_ s: InstanceSpec) async -> Bool {
+        await install(s)
+    }
+
+    /// Removes `versions/<id>`, `.honeycrisp`, and `mods/` while keeping `saves/` and `screenshots/` untouched.
+    func uninstall(_ s: InstanceSpec) {
+        guard !isBusy else { return }
+        let fm = FileManager.default
+        if let stamp = installer.stamp(s.mc), stamp.versionID != s.mc {
+            try? fm.removeItem(at: paths.versions.appending(path: stamp.versionID))
+        }
+        try? fm.removeItem(at: paths.versions.appending(path: s.mc))
+        try? fm.removeItem(at: paths.instance(s.mc).appending(path: ".honeycrisp"))
+        try? fm.removeItem(at: paths.mods(s.mc))
+        instanceSizes[s.mc] = nil
+        statusTick &+= 1
+    }
 
     // MARK: Accounts
 
@@ -198,7 +330,12 @@ final class AppModel {
     func install(_ s: InstanceSpec) async -> Bool {
         phase[s.mc] = .working(0, "Preparing…")
         workStarted[s.mc] = Date()
-        defer { if case .working = phase[s.mc] { phase[s.mc] = .idle }; workStarted[s.mc] = nil; statusTick += 1 }
+        defer {
+            if case .working = phase[s.mc] { phase[s.mc] = .idle }
+            workStarted[s.mc] = nil
+            statusTick &+= 1
+            refreshInstanceSizes()
+        }
         do {
             let stamp = try await installer.install(s, options) { [weak self] f, m in
                 Task { @MainActor in
@@ -217,6 +354,7 @@ final class AppModel {
         guard !isBusy else { return }
         let s = spec
         banner = nil
+        canOfferPlayOffline = false
         task = Task {
             guard account != nil else {
                 banner = "Sign in with Microsoft or choose Offline mode first."
@@ -229,11 +367,31 @@ final class AppModel {
                 try await launch(s, acct)
             } catch {
                 banner = error.localizedDescription
+                if account?.kind == .microsoft, (error as? AuthError) != .clientNotApproved, (error as? AuthError) != .cancelled {
+                    canOfferPlayOffline = true
+                }
+            }
+        }
+    }
+
+    func playOffline() {
+        guard !isBusy else { return }
+        let s = spec
+        let fallback = Account.offline(account?.name ?? "Player")
+        banner = nil
+        canOfferPlayOffline = false
+        task = Task {
+            if status(s) != .ready, !(await install(s)) { return }
+            do {
+                try await launch(s, fallback)
+            } catch {
+                banner = error.localizedDescription
             }
         }
     }
 
     private func launch(_ s: InstanceSpec, _ acct: Account) async throws {
+        syncUIToConfigs()
         let p = try await installer.prepareLaunch(s)
         let w = settings.windowWidth, h = settings.windowHeight
         var c = LaunchContext(
@@ -242,7 +400,7 @@ final class AppModel {
             nativesDir: paths.natives(s.mc).path, clientJar: paths.clientJar(s.mc).path, classpath: p.classpath,
             playerName: acct.name, uuid: acct.uuid, accessToken: acct.accessToken,
             userType: acct.kind == .microsoft ? "msa" : "legacy", xuid: acct.xuid ?? "0", clientID: effectiveClientID,
-            memoryMB: settings.memoryMB, extraJVMArgs: settings.extraJVMArgs.split(separator: " ").map(String.init),
+            memoryMB: settings.memoryMB, extraJVMArgs: LaunchCommand.splitArgs(settings.extraJVMArgs),
             loggingConfigPath: p.loggingConfig, launcherVersion: Self.version)
         if w > 0, h > 0 { c.windowSize = (w, h) }
         let argv = try LaunchCommand.build(p.version, c)
@@ -258,7 +416,14 @@ final class AppModel {
         guard mkfifo(fifo.path, 0o600) == 0, let pipe = FileHandle(forUpdatingAtPath: fifo.path) else {
             throw CocoaError(.fileWriteUnknown, userInfo: [NSLocalizedDescriptionKey: "Couldn't create the game log pipe"])
         }
-        let stub = try gameApp()
+        let stub: URL
+        do {
+            stub = try gameApp()
+        } catch {
+            try? pipe.close()
+            try? FileManager.default.removeItem(at: fifo)
+            throw error
+        }
         let config = NSWorkspace.OpenConfiguration()
         config.createsNewApplicationInstance = true
         config.arguments = [fifo.path, paths.instance(s.mc).path] + argv
@@ -277,13 +442,22 @@ final class AppModel {
         let cmd = argv.map { $0.contains(" ") ? "'\($0)'" : $0 }.joined(separator: " ")
         // Offline token is "0": redacting it would mangle every zero in the command line.
         log = ["$ " + (acct.kind == .microsoft ? cmd.replacingOccurrences(of: acct.accessToken, with: "<token>") : cmd)]
+        logIsFromDisk = false
+        diskLogVersion = s.mc
         crashReport = nil
+        crashReportURL = nil
         stopRequested = false
         // Busy before the (multi-second) open, so Play can't start a second copy meanwhile.
         runningVersion = s.mc
         let app: NSRunningApplication
         do { app = try await NSWorkspace.shared.openApplication(at: stub, configuration: config) }
-        catch { pipe.readabilityHandler = nil; try? pipe.close(); runningVersion = nil; throw error }
+        catch {
+            pipe.readabilityHandler = nil
+            try? pipe.close()
+            try? FileManager.default.removeItem(at: fifo)
+            runningVersion = nil
+            throw error
+        }
         // The game isn't our child, so there's no exit code: a crash is a crash report written during the run.
         let game = paths.instance(s.mc)
         let watch = app.observe(\.isTerminated, options: [.initial, .new]) { [weak self] app, _ in
@@ -358,20 +532,61 @@ final class AppModel {
     private func finished(_ s: InstanceSpec, code: Int32, signaled: Bool, started: Date) {
         game?.log.readabilityHandler = nil
         try? game?.log.close()
+        try? FileManager.default.removeItem(at: paths.root.appending(path: "run/game.log"))
         game?.watch.invalidate()
         game = nil
         runningVersion = nil
+        syncUIFromConfig(mc: s.mc)
+        statusTick &+= 1
+        refreshInstanceSizes()
         let stopped = stopRequested
         stopRequested = false
         guard !Self.isNormalExit(code: code, signaled: signaled, stopRequested: stopped) else { return }
-        crashReport = Self.newestCrashReport(in: paths.instance(s.mc), since: started)
+        if let found = Self.newestCrashReportFile(in: paths.instance(s.mc), since: started) {
+            crashReport = found.content
+            crashReportURL = found.url
+        } else {
+            crashReport = nil
+            crashReportURL = nil
+        }
         banner = "Minecraft \(s.mc) crashed (exit code \(code))."
         NSApp.unhide(nil)
         NSApp.activate()
     }
 
-    /// crash-reports/*.txt first, then a JVM hs_err_pid*.log, newer than the launch.
-    static func newestCrashReport(in game: URL, since: Date) -> String? {
+    /// Loads `<instance>/logs/latest.log` and the newest crash report from disk when no session log is active.
+    func loadDiskLogIfNeeded(for mc: String? = nil, force: Bool = false) {
+        guard runningVersion == nil else { return }
+        let target = mc ?? spec.mc
+        let game = paths.instance(target)
+        let shouldReload = force || log.isEmpty || (logIsFromDisk && diskLogVersion != target)
+        if shouldReload {
+            let latest = game.appending(path: "logs/latest.log")
+            if let content = try? String(contentsOf: latest, encoding: .utf8), !content.isEmpty {
+                var lines = content.components(separatedBy: .newlines)
+                if lines.last == "" { lines.removeLast() }
+                log = lines
+                logIsFromDisk = true
+            } else if logIsFromDisk && diskLogVersion != target {
+                log = []
+                logIsFromDisk = false
+            }
+        }
+        if shouldReload || (crashReport == nil && diskLogVersion != target) {
+            if let found = Self.newestCrashReportFile(in: game, since: nil) {
+                crashReport = found.content
+                crashReportURL = found.url
+                logIsFromDisk = true
+            } else if logIsFromDisk && diskLogVersion != target {
+                crashReport = nil
+                crashReportURL = nil
+            }
+        }
+        diskLogVersion = target
+    }
+
+    /// crash-reports/*.txt first, then a JVM hs_err_pid*.log, optionally newer than `since`.
+    static func newestCrashReportFile(in game: URL, since: Date? = nil) -> (url: URL, content: String)? {
         let fm = FileManager.default
         let candidates = [game.appending(path: "crash-reports"), game].flatMap { dir in
             ((try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.contentModificationDateKey])) ?? [])
@@ -379,9 +594,30 @@ final class AppModel {
         }
         let newest = candidates
             .compactMap { u in (try? u.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate).map { (u, $0) } }
-            .filter { $0.1 >= since }
+            .filter { since == nil || $0.1 >= since! }
             .max { $0.1 < $1.1 }
-        return newest.flatMap { try? String(contentsOf: $0.0, encoding: .utf8) }
+        guard let (url, _) = newest, let content = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+        return (url, content)
+    }
+
+    static func newestCrashReport(in game: URL, since: Date) -> String? {
+        newestCrashReportFile(in: game, since: since)?.content
+    }
+
+    /// One-line human-readable diagnosis for common crash causes.
+    static func diagnoseCrash(_ report: String) -> String? {
+        if report.contains("OutOfMemoryError") || report.contains("There is insufficient memory") {
+            return "Out of memory — try raising the Memory slider in Settings → Game."
+        }
+        if report.contains("UnsupportedClassVersionError") {
+            return "Incompatible Java version — check or reset the Java runtime override in Settings → Java."
+        }
+        if report.contains("ModResolutionException") || report.contains("DuplicateModsFoundException")
+            || report.contains("Incompatible mod set") || report.contains("MissingModsException")
+            || report.contains("LoaderException") || report.contains("MixinApplyError") {
+            return "Incompatible or duplicate mods detected — check your installed jars in the Mods tab."
+        }
+        return nil
     }
 
     /// Quitting, Stop, Ctrl-C or SIGTERM (JVM exits 128+15 = 143, 128+2 = 130) are not crashes.
@@ -418,16 +654,4 @@ final class AppModel {
     }
 
     static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
-}
-
-/// Splits pipe chunks into lines; called on the pipe's background queue only.
-final class LineSplitter: @unchecked Sendable {
-    private var buffer = Data()
-    func feed(_ d: Data) -> [String] {
-        buffer.append(d)
-        guard let last = buffer.lastIndex(of: 0x0A) else { return [] }
-        let chunk = buffer[..<last]
-        buffer = Data(buffer[buffer.index(after: last)...])
-        return String(decoding: chunk, as: UTF8.self).components(separatedBy: "\n")
-    }
 }

@@ -31,6 +31,7 @@ public class MinecraftMixin {
 	private void honeycrisp$init(CallbackInfo ci) {
 		try {
 			Honeycrisp.init(McPlatform.INSTANCE);
+			dev.honeycrisp.ui.screens.MenuActions.set(new dev.honeycrisp.v1_21_11.McMenuActions());
 		} catch (Throwable t) {
 			LoggerFactory.getLogger("Honeycrisp Client").error("Honeycrisp Client failed to initialize; running vanilla", t);
 		}

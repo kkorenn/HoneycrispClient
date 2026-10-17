@@ -46,6 +46,16 @@ public abstract class Module {
 		return true;
 	}
 
+	/** False when this feature does not apply to the running Minecraft version (DESIGN 3.10). */
+	public boolean availableOn(String mcVersion) {
+		return true;
+	}
+
+	/** Tooltip shown when {@link #availableOn} is false. */
+	public String unavailableReason(String mcVersion) {
+		return "Not available on Minecraft " + mcVersion;
+	}
+
 	public List<Setting<?>> settings() {
 		return Collections.unmodifiableList(settings);
 	}

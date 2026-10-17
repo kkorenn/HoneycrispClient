@@ -138,11 +138,16 @@ class ScreensTest {
 	void mainMenu() throws Exception {
 		MainMenu m = new MainMenu();
 		m.init(W, H);
+		final int[] realmsClicks = {0};
 		MenuActions.set(new MenuActions() {
 			public void singleplayer() {
 			}
 
 			public void multiplayer() {
+			}
+
+			public void realms() {
+				realmsClicks[0]++;
 			}
 
 			public void options() {
@@ -156,6 +161,20 @@ class ScreensTest {
 		});
 		try {
 			shoot(m, "main-menu", 480, 330);
+			Field realmsField = MainMenu.class.getDeclaredField("realms");
+			realmsField.setAccessible(true);
+			dev.honeycrisp.ui.widgets.Button realms = (dev.honeycrisp.ui.widgets.Button) realmsField.get(m);
+			click(m, realms.x + realms.w / 2, realms.y + realms.h / 2);
+			assertEquals(1, realmsClicks[0]);
+			m.init(440, 360);
+			shoot(m, "main-menu-compact", 0, 0);
+			Field quitField = MainMenu.class.getDeclaredField("quit");
+			quitField.setAccessible(true);
+			dev.honeycrisp.ui.widgets.Button quit = (dev.honeycrisp.ui.widgets.Button) quitField.get(m);
+			assertTrue(realms.y + realms.h < quit.y);
+			assertTrue(quit.y + quit.h < 360 - Theme.u(44));
+			click(m, realms.x + realms.w / 2, realms.y + realms.h / 2);
+			assertEquals(2, realmsClicks[0]);
 		} finally {
 			MenuActions.set(null);
 		}

@@ -22,6 +22,11 @@ public class MainMenu extends BaseScreen {
 			if (MenuActions.get() != null) MenuActions.get().multiplayer();
 		}
 	});
+	private final Button realms = new Button("Realms", "globe", Button.Size.XLARGE, Button.Style.CLEAR, new Runnable() {
+		public void run() {
+			if (MenuActions.get() != null) MenuActions.get().realms();
+		}
+	});
 	private final Button mods = new Button("Mods", "puzzlepiece.extension", Button.Size.LARGE, Button.Style.CLEAR, new Runnable() {
 		public void run() {
 			open(Honeycrisp.screens().modMenu);
@@ -62,16 +67,20 @@ public class MainMenu extends BaseScreen {
 		Gfx.text(r, version, u(12), u(12), footnote, 0x99EBEBF5);
 		accountChip(r, W - u(16), u(16));
 		// wordmark
-		float wmTop = H * 0.26f;
+		boolean compact = H < u(480);
+		float wmTop = compact ? u(56) : H * 0.26f;
 		dev.honeycrisp.ui.draw.Font wm = narrow ? Theme.font(36, 800) : wordmark;
 		Gfx.textMidCentered(r, "Honeycrisp", W / 2, wmTop + Gfx.lineHeight(wm) / 2, wm, 0xF2FFFFFF);
 		// stack
-		float sw = u(narrow ? 260 : 300), sx = (W - sw) / 2, y = wmTop + Gfx.lineHeight(wm) + u(36);
+		float sw = u(narrow ? 260 : 300), sx = (W - sw) / 2, y = wmTop + Gfx.lineHeight(wm) + u(compact ? 20 : 36);
+		float playHeight = u(compact ? 36 : 48), playGap = u(compact ? 8 : 10);
 		if (actions != null) {
-			ui.add(singleplayer.at(sx, y, sw, u(48))).render(r, mx, my);
-			y += u(48 + 10);
-			ui.add(multiplayer.at(sx, y, sw, u(48))).render(r, mx, my);
-			y += u(48 + 16);
+			ui.add(singleplayer.at(sx, y, sw, playHeight)).render(r, mx, my);
+			y += playHeight + playGap;
+			ui.add(multiplayer.at(sx, y, sw, playHeight)).render(r, mx, my);
+			y += playHeight + playGap;
+			ui.add(realms.at(sx, y, sw, playHeight)).render(r, mx, my);
+			y += playHeight + u(compact ? 8 : 16);
 			float qw = u(36), rest = sw - qw - u(16);
 			float mw = Math.round(rest * 0.53f);
 			ui.add(mods.at(sx, y, mw, u(36))).render(r, mx, my);

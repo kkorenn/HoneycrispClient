@@ -1,6 +1,7 @@
 package dev.honeycrisp.v26_3;
 
 import dev.honeycrisp.ui.screens.MenuActions;
+import com.mojang.realmsclient.RealmsMainScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.gui.screens.multiplayer.SafetyScreen;
@@ -24,6 +25,11 @@ public final class McMenuActions implements MenuActions {
 	public void multiplayer() {
 		Minecraft mc = mc();
 		mc.gui.setScreen(mc.options.skipMultiplayerWarning ? new JoinMultiplayerScreen(mc.gui.screen()) : new SafetyScreen(mc.gui.screen()));
+	}
+
+	@Override
+	public void realms() {
+		mc().gui.setScreen(new RealmsMainScreen(mc().gui.screen()));
 	}
 
 	@Override

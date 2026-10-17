@@ -32,6 +32,7 @@ public class MinecraftMixin {
 	private void honeycrisp$init(CallbackInfo ci) {
 		try {
 			Honeycrisp.init(McPlatform.INSTANCE);
+			dev.honeycrisp.ui.screens.MenuActions.set(new dev.honeycrisp.v1_21.McMenuActions());
 		} catch (Throwable t) {
 			LoggerFactory.getLogger("Honeycrisp Client").error("Honeycrisp Client failed to initialize; running vanilla", t);
 		}
@@ -65,7 +66,8 @@ public class MinecraftMixin {
 	/** Recolors the entity hurt overlay (OverlayTexture rows 0–7); 0 restores vanilla red. */
 	@Unique
 	private static void honeycrisp$applyHitColor(int argb) {
-		int color = argb == 0 ? VANILLA_HURT : argb;
+		// Honeycrisp alpha = tint strength; the entity shader uses overlay alpha as the untinted share
+		int color = argb == 0 ? VANILLA_HURT : (255 - (argb >>> 24)) << 24 | argb & 0xFFFFFF;
 		if (color == appliedHitColor) return;
 		appliedHitColor = color;
 		DynamicTexture t = ((OverlayTextureAccessor) Minecraft.getInstance().gameRenderer.overlayTexture()).honeycrisp$texture();

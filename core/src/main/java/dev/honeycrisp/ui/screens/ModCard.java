@@ -1,6 +1,8 @@
 package dev.honeycrisp.ui.screens;
 
+import dev.honeycrisp.Honeycrisp;
 import dev.honeycrisp.module.Module;
+import dev.honeycrisp.platform.Platform;
 import dev.honeycrisp.platform.Renderer;
 import dev.honeycrisp.ui.draw.Font;
 import dev.honeycrisp.ui.widgets.Button;
@@ -30,21 +32,32 @@ final class ModCard extends Widget {
 		well = new Motion(Motion.SNAPPY, module.enabled() ? 1 : 0);
 	}
 
+	private boolean available() {
+		Platform p = Honeycrisp.platform();
+		return module.availableOn(p != null ? p.minecraftVersion() : "");
+	}
+
 	void render(Renderer r, Ui ui, float mx, float my, String query) {
+		boolean avail = available();
+		float old = Gfx.opacity;
+		if (!avail) Gfx.opacity *= 0.4f;
 		ui.add(this);
-		float hv = hover.to(hovered(mx, my) ? 1 : 0), on = well.to(module.enabled());
+		float cmx = avail ? mx : -1e6f, cmy = avail ? my : -1e6f;
+		float hv = hover.to(avail && hovered(mx, my) ? 1 : 0), on = well.to(avail && module.enabled());
 		float g = hv * w * 0.0075f, cx = x - g, cy = y - g, cw = w + 2 * g, ch = h + 2 * g, rad = u(20);
 		if (hv > 0.01f) Gfx.shadow(r, cx, cy + u(2 + 4 * hv), cw, ch, rad, u(8 + 8 * hv), alpha(dark ? 0x33000000 : 0x14000000, hv));
 		Gfx.groupGlass(r, cx, cy, cw, ch, rad, true);
 		if (hv > 0.01f) Gfx.stroke(r, cx, cy, cw, ch, rad, u(1), alpha(strokeSpec, hv));
-		if (pressed && hovered(mx, my)) Gfx.rect(r, cx, cy, cw, ch, rad, pressedOverlay());
+		if (avail && pressed && hovered(mx, my)) Gfx.rect(r, cx, cy, cw, ch, rad, pressedOverlay());
 		// icon well
 		float wx = x + u(12), wy = y + u(12), ws = u(36);
 		Gfx.rect(r, wx, wy, ws, ws, u(8), mix(fill2, accent, on));
 		Gfx.iconAt(r, module.sfSymbol, wx + ws / 2, wy + ws / 2, u(20), mix(label2, onAccent, on));
 		if (module.canDisable()) {
+			toggle.enabled = true;
 			toggle.at(x + w - u(12 + 38), y + u(19), u(38), u(22));
-			ui.add(toggle).render(r, mx, my);
+			ui.add(toggle).render(r, cmx, cmy);
+			toggle.enabled = avail;
 		}
 		// name with matched characters emphasized
 		float ny = y + u(58);
@@ -69,9 +82,17 @@ final class ModCard extends Widget {
 			Gfx.text(r, l, x + u(12), dy, subheadline, label2);
 			dy += lh;
 		}
+		gear.enabled = true;
 		gear.at(x + w - u(12 + 24), y + h - u(12 + 24), u(24), u(24));
-		ui.add(gear).render(r, mx, my);
-		if (gear.hovered(mx, my)) ui.tooltip(module.name + " Settings", mx, my);
+		ui.add(gear).render(r, cmx, cmy);
+		gear.enabled = avail;
+		Gfx.opacity = old;
+		if (!avail && hit(mx, my)) {
+			Platform p = Honeycrisp.platform();
+			ui.tooltip(module.unavailableReason(p != null ? p.minecraftVersion() : ""), mx, my);
+		} else if (gear.hovered(mx, my)) {
+			ui.tooltip(module.name + " Settings", mx, my);
+		}
 	}
 
 	@Override
@@ -80,13 +101,14 @@ final class ModCard extends Widget {
 
 	@Override
 	public boolean mouseClicked(float mx, float my, int button) {
+		if (!available()) return false;
 		pressed = button == 0;
 		return pressed;
 	}
 
 	@Override
 	public void mouseReleased(float mx, float my, int button) {
-		if (pressed && hit(mx, my) && module.canDisable()) module.toggle();
+		if (pressed && hit(mx, my) && available() && module.canDisable()) module.toggle();
 		pressed = false;
 	}
 }

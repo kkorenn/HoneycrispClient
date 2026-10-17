@@ -3,9 +3,8 @@ package dev.honeycrisp.ui.widgets;
 import dev.honeycrisp.module.Spring;
 
 /**
- * One animated value driven by Platform time ({@link Theme#now}). Uses module.Spring (critically damped) with
- * omega = 2π / response, so the DESIGN.md presets keep their response; ponytail: no under-damped bounce
- * (snappy 0.85 / bouncy 0.7 settle without overshoot), add a damped spring if the bounce is wanted.
+ * One animated value driven by Platform time ({@link Theme#now}). Uses {@link Spring} with
+ * omega = 2π / response and damping per DESIGN.md §2.8 (SNAPPY = 0.85, BOUNCY = 0.70, others = 1.0).
  */
 public final class Motion {
 	public static final double QUICK = 0.20, SMOOTH = 0.40, SNAPPY = 0.30, BOUNCY = 0.45;
@@ -13,7 +12,11 @@ public final class Motion {
 	private long last = Long.MIN_VALUE;
 
 	public Motion(double response, double initial) {
-		spring = new Spring(2 * Math.PI / response, initial);
+		this(response, Math.abs(response - SNAPPY) < 1e-6 ? 0.85 : Math.abs(response - BOUNCY) < 1e-6 ? 0.70 : 1.0, initial);
+	}
+
+	public Motion(double response, double damping, double initial) {
+		spring = new Spring(2 * Math.PI / response, damping, initial);
 	}
 
 	/** Retargets (keeping velocity) and advances to the current frame time. */

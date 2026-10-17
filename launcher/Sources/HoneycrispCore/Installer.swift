@@ -131,6 +131,11 @@ public actor Installer {
     /// separately (`GitHub.updateAvailable`) against releases fetched on launch/refresh.
     public nonisolated func needsUpdate(_ spec: InstanceSpec, _ o: InstallOptions) -> Bool {
         guard let s = stamp(spec.mc) else { return true }
+        let modsDir = paths.modsDir(spec.id)
+        let fm = FileManager.default
+        if !s.managedMods.allSatisfy({ fm.fileExists(atPath: modsDir.appending(path: $0).path) }) {
+            return true
+        }
         let jars = o.localJars.map { localModJars(spec.mc, $0) } ?? s.jars ?? []
         return s.fingerprint != fingerprint(spec, o, jars: jars)
     }
@@ -171,7 +176,7 @@ public actor Installer {
     public func install(_ spec: InstanceSpec, _ o: InstallOptions, progress: @escaping Progress) async throws -> InstallStamp {
         let fm = FileManager.default
         let game = paths.instance(spec.mc)
-        for d in ["mods", "config", "saves", "resourcepacks"] {
+        for d in ["mods", "config", "saves", "resourcepacks", "shaderpacks"] {
             try fm.createDirectory(at: game.appending(path: d), withIntermediateDirectories: true)
         }
         let options = game.appending(path: "options.txt")

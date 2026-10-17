@@ -22,7 +22,8 @@ class PrimitivesTest {
 		assertEquals(0xFF, MacNative.accentColor() >>> 24);
 		double s = MacNative.backingScale();
 		assertTrue(s >= 1 && s <= 4, "backingScale " + s);
-		assertNull(MacNative.renderSymbol("no.such.symbol.xyz", 32, 24, 400));
+		assertArrayEquals(MacNative.renderSymbol("questionmark.square.dashed", 32, 24, 400),
+			MacNative.renderSymbol("no.such.symbol.xyz", 32, 24, 400));
 		assertNotNull(MacNative.renderSymbol("gearshape", 32, 24, 400));
 		int[] info = new int[4];
 		assertNull(MacNative.renderText("   ", 13, 400, false, info));
@@ -31,6 +32,7 @@ class PrimitivesTest {
 		float[] m = MacNative.measureText("Hello", 13, 400, false);
 		assertTrue(m[0] > 20 && m[0] < 40 && m[1] > 10, "metrics " + m[0] + " " + m[1]);
 		assertEquals(2 * MacNative.measureText("Hello", 13, 400, false)[0], MacNative.measureText("HelloHello", 13, 400, false)[0], 0.5);
+		assertEquals(MacNative.measureText("111", 13, 400, false)[0], MacNative.measureText("888", 13, 400, false)[0], 0.01f);
 	}
 
 	@Test

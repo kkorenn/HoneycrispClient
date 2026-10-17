@@ -25,6 +25,16 @@ public final class OldAnimationsModule extends Module {
 		return flags[which.ordinal()];
 	}
 
+	@Override
+	public boolean availableOn(String mcVersion) {
+		return !"1.7.10".equals(mcVersion);
+	}
+
+	@Override
+	public String unavailableReason(String mcVersion) {
+		return "1.7 animations are native in Minecraft 1.7.10";
+	}
+
 	private static String label(OldAnimation a) {
 		switch (a) {
 			case BLOCK_HIT: return "Block Hitting";

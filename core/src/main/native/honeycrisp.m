@@ -3,6 +3,7 @@
 // thread and needs no NSApplication.
 #import <AppKit/AppKit.h>
 #import <CoreText/CoreText.h>
+#import <CoreText/SFNTLayoutTypes.h>
 #include <jni.h>
 #include <math.h>
 #include <stdlib.h>
@@ -19,7 +20,16 @@ static NSFontWeight fontWeight(int w) {
 
 static NSFont *systemFont(float px, int weight, jboolean mono) {
 	NSFontWeight w = fontWeight(weight);
-	return mono ? [NSFont monospacedSystemFontOfSize:px weight:w] : [NSFont systemFontOfSize:px weight:w];
+	if (mono) return [NSFont monospacedSystemFontOfSize:px weight:w];
+	NSFont *base = [NSFont systemFontOfSize:px weight:w];
+	NSFontDescriptor *desc = [base.fontDescriptor fontDescriptorByAddingAttributes:@{
+		NSFontFeatureSettingsAttribute: @[@{
+			NSFontFeatureTypeIdentifierKey: @(kNumberSpacingType),
+			NSFontFeatureSelectorIdentifierKey: @(kMonospacedNumbersSelector)
+		}]
+	}];
+	NSFont *tabular = [NSFont fontWithDescriptor:desc size:px];
+	return tabular ? tabular : base;
 }
 
 static NSString *jstr(JNIEnv *env, jstring s) {
@@ -96,11 +106,25 @@ JNIEXPORT jbyteArray JNICALL Java_dev_honeycrisp_mac_MacNative_renderText(JNIEnv
 	}
 }
 
-// SF Symbol (template, white) centered in a box×box bitmap; null when the symbol does not exist.
+// SF Symbol (template, white) centered in a box×box bitmap; falls back to questionmark.square.dashed when the symbol does not exist.
 JNIEXPORT jbyteArray JNICALL Java_dev_honeycrisp_mac_MacNative_renderSymbol(JNIEnv *env, jclass cls, jstring name, jint box, jfloat pointSize, jint weight) {
 	@autoreleasepool {
-		NSImage *img = [NSImage imageWithSystemSymbolName:jstr(env, name) accessibilityDescription:nil];
-		if (!img || box <= 0) return NULL;
+		if (box <= 0 || !name) return NULL;
+		NSString *sym = jstr(env, name);
+		NSImage *img = [NSImage imageWithSystemSymbolName:sym accessibilityDescription:nil];
+		if (!img) {
+			static NSMutableSet<NSString *> *missing = nil;
+			static dispatch_once_t once;
+			dispatch_once(&once, ^{ missing = [NSMutableSet new]; });
+			@synchronized (missing) {
+				if (![missing containsObject:sym]) {
+					[missing addObject:sym];
+					fprintf(stderr, "[Honeycrisp Client] missing SF Symbol: %s\n", sym.UTF8String);
+				}
+			}
+			img = [NSImage imageWithSystemSymbolName:@"questionmark.square.dashed" accessibilityDescription:nil];
+		}
+		if (!img) return NULL;
 		img = [img imageWithSymbolConfiguration:[NSImageSymbolConfiguration configurationWithPointSize:pointSize weight:fontWeight(weight) scale:NSImageSymbolScaleMedium]];
 		NSSize s = img.size;
 		if (s.width <= 0 || s.height <= 0) return NULL;

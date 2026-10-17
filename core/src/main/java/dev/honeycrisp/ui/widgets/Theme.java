@@ -63,6 +63,18 @@ public final class Theme {
 		if (fontsAt != k) fonts();
 	}
 
+	public static int red(boolean dark) {
+		return dark ? 0xFFFF453A : 0xFFFF3B30;
+	}
+
+	public static int orange(boolean dark) {
+		return dark ? 0xFFFF9F0A : 0xFFFF9500;
+	}
+
+	public static int green(boolean dark) {
+		return dark ? 0xFF32D74B : 0xFF28CD41;
+	}
+
 	public static int resolveAccent(UiPrefs.Accent a) {
 		switch (a) {
 			case BLUE: return blue;

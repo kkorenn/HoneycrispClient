@@ -231,7 +231,7 @@ struct PlayButtonStyle: ButtonStyle {
             .padding(.horizontal, 28)
             .frame(minWidth: Theme.playMinWidth, minHeight: Theme.playHeight)
             .background {
-                Capsule().fill(running ? Color(white: 0.22) : Theme.Palette.play)
+                Capsule().fill(running ? Theme.Palette.red : Theme.Palette.play)
                     .overlay { Capsule().fill(.white.opacity(hover && enabled ? 0.10 : 0)) }
                     .overlay {
                         Capsule().strokeBorder(.white.opacity(0.25), lineWidth: 1)

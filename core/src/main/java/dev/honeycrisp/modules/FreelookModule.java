@@ -18,7 +18,7 @@ public final class FreelookModule extends Module {
 	private float yaw, pitch;
 
 	public FreelookModule() {
-		super("freelook", "Freelook", "Look around without turning", Category.CAMERA, "eye.circle");
+		super("freelook", "Freelook", "Look around without turning", Category.CAMERA, "eye");
 	}
 
 	/** Polled every frame with the player's rotation; captures it as the camera start when freelook begins. */

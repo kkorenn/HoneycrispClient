@@ -15,7 +15,7 @@ public final class CpsModule extends TextHudModule {
 	private long now;
 
 	public CpsModule() {
-		super("cps", "CPS", "Clicks per second", Category.HUD, "cursorarrow.click", Anchor.TOP_LEFT, 4, 22);
+		super("cps", "CPS", "Clicks per second", Category.HUD, "cursorarrow.click.2", Anchor.TOP_LEFT, 4, 22);
 		enabledByDefault();
 	}
 

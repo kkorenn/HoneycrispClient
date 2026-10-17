@@ -257,9 +257,15 @@ struct HomeView: View {
         .scrollIndicators(.hidden)
         .overlay(alignment: .top) {
             if let banner = model.banner {
-                Toast(text: banner, crash: model.crashReport != nil, showLog: { withAnimation(Theme.Motion.spring) { model.selection = .log } }, dismiss: { model.banner = nil })
-                    .padding(.top, 14)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                Toast(
+                    text: banner,
+                    crash: model.crashReport != nil,
+                    playOffline: model.canOfferPlayOffline ? { model.playOffline() } : nil,
+                    showLog: { withAnimation(Theme.Motion.spring) { model.selection = .log } },
+                    dismiss: { model.banner = nil; model.canOfferPlayOffline = false }
+                )
+                .padding(.top, 14)
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
         .overlay(alignment: .topTrailing) { HeaderButtons().padding(.top, 14).padding(.trailing, 16) }
@@ -332,6 +338,7 @@ struct InstanceFacts: View {
 struct Toast: View {
     var text: String
     var crash: Bool
+    var playOffline: (() -> Void)? = nil
     var showLog: () -> Void
     var dismiss: () -> Void
 
@@ -341,6 +348,10 @@ struct Toast: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(crash ? .red : Theme.warning)
             Text(text).font(.system(size: 13, weight: .medium)).lineLimit(2)
+            if let playOffline {
+                Button("Play Offline", action: playOffline)
+                    .buttonStyle(.plain).font(.system(size: 13, weight: .semibold)).foregroundStyle(.tint)
+            }
             Button(crash ? "View Crash Report" : "Show Log", action: showLog)
                 .buttonStyle(.plain).font(.system(size: 13, weight: .semibold)).foregroundStyle(.tint)
             Button(action: dismiss) { Image(systemName: "xmark").font(.system(size: 10, weight: .bold)) }
@@ -348,7 +359,7 @@ struct Toast: View {
         }
         .padding(.leading, 14).padding(.trailing, 16).padding(.vertical, 10)
         .glassCapsule()
-        .frame(maxWidth: 560)
+        .frame(maxWidth: 620)
     }
 }
 
@@ -417,7 +428,7 @@ struct PlayBar: View {
             .allowsHitTesting(false)
         case .running:
             Button(role: .destructive) { model.stop() } label: {
-                Label { Text("Stop") } icon: { Image(systemName: "stop.fill").foregroundStyle(Color(red: 1, green: 0.42, blue: 0.38)) }
+                Label("Stop", systemImage: "stop.fill")
                     .labelStyle(PlayLabelStyle())
             }
             .buttonStyle(PlayButtonStyle(running: true))

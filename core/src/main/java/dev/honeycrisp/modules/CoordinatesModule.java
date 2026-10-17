@@ -17,7 +17,7 @@ public final class CoordinatesModule extends TextHudModule {
 	public final BooleanSetting biome = setting(new BooleanSetting("biome", "Show Biome", false));
 
 	public CoordinatesModule() {
-		super("coords", "Coordinates", "Position, facing and biome", Category.HUD, "location", Anchor.TOP_LEFT, 4, 58);
+		super("coords", "Coordinates", "Position, facing and biome", Category.HUD, "mappin.and.ellipse", Anchor.TOP_LEFT, 4, 58);
 		enabledByDefault();
 	}
 

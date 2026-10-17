@@ -116,7 +116,8 @@ public final class McRenderer implements Renderer {
 
 	/** Recolors the entity hurt overlay (OverlayTexture rows 0–7); 0 restores vanilla red. Called once per tick. */
 	public static void applyHitColor(int argb) {
-		int color = argb == 0 ? VANILLA_HURT : argb;
+		// Honeycrisp alpha = tint strength; the entity shader uses overlay alpha as the untinted share
+		int color = argb == 0 ? VANILLA_HURT : (255 - (argb >>> 24)) << 24 | argb & 0xFFFFFF;
 		if (color == appliedHitColor) return;
 		appliedHitColor = color;
 		DynamicTexture t = ((OverlayTextureAccessor) Minecraft.getInstance().gameRenderer.overlayTexture()).honeycrisp$texture();

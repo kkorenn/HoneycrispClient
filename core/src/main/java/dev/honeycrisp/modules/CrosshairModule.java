@@ -36,7 +36,7 @@ public final class CrosshairModule extends Module implements Crosshair {
 	public final BooleanSetting centerDot = setting(new BooleanSetting("dot", "Center Dot", false));
 
 	public CrosshairModule() {
-		super("crosshair", "Crosshair", "Custom crosshair", Category.PVP, "scope");
+		super("crosshair", "Crosshair", "Custom crosshair", Category.VISUAL, "scope");
 	}
 
 	@Override

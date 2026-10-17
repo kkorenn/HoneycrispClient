@@ -89,6 +89,11 @@ final class Game189 implements GameInfo {
 	}
 
 	@Override
+	public long worldAge() {
+		return inWorld() ? mc().theWorld.getWorldTime() : 0;
+	}
+
+	@Override
 	public String playerName() {
 		return mc().getSession().getUsername();
 	}

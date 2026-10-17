@@ -45,7 +45,7 @@ final class ModuleSheet extends Sheet {
 		enable = m.canDisable() ? new Toggle(Value.enabled(m), false) : null;
 		form = new Form();
 		List<Setting<?>> appearance = m instanceof HudModule
-			? Arrays.<Setting<?>>asList(((HudModule) m).scale, ((HudModule) m).background, ((HudModule) m).shadow, ((HudModule) m).textColor)
+			? Arrays.<Setting<?>>asList(((HudModule) m).style, ((HudModule) m).scale, ((HudModule) m).background, ((HudModule) m).outline, ((HudModule) m).shadow, ((HudModule) m).textColor)
 			: Arrays.<Setting<?>>asList();
 		if (m instanceof HudModule) {
 			Form.Group g = form.group("Appearance");

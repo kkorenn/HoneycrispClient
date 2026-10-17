@@ -105,4 +105,62 @@ public enum LaunchCommand {
         b[8] = b[8] & 0x3f | 0x80
         return UUID(uuid: (b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], b[9], b[10], b[11], b[12], b[13], b[14], b[15]))
     }
+
+    /// Splits a shell-style JVM argument string, honoring single quotes, double quotes, and backslash-escaped spaces.
+    public static func splitArgs(_ raw: String) -> [String] {
+        var args: [String] = []
+        var current = ""
+        var inToken = false
+        var quote: Character?
+        var it = raw.makeIterator()
+        while let ch = it.next() {
+            if let q = quote {
+                if ch == "\\" && q == "\"" {
+                    if let next = it.next() {
+                        current.append(next)
+                    } else {
+                        current.append(ch)
+                    }
+                } else if ch == q {
+                    quote = nil
+                } else {
+                    current.append(ch)
+                }
+            } else if ch == "\\" {
+                inToken = true
+                if let next = it.next() {
+                    current.append(next)
+                }
+            } else if ch == "\"" || ch == "'" {
+                inToken = true
+                quote = ch
+            } else if ch.isWhitespace {
+                if inToken {
+                    args.append(current)
+                    current = ""
+                    inToken = false
+                }
+            } else {
+                inToken = true
+                current.append(ch)
+            }
+        }
+        if inToken {
+            args.append(current)
+        }
+        return args
+    }
+}
+
+/// Splits pipe chunks into lines; called on the pipe's background queue only.
+public final class LineSplitter: @unchecked Sendable {
+    private var buffer = Data()
+    public init() {}
+    public func feed(_ d: Data) -> [String] {
+        buffer.append(d)
+        guard let last = buffer.lastIndex(of: 0x0A) else { return [] }
+        let chunk = buffer[..<last]
+        buffer = Data(buffer[buffer.index(after: last)...])
+        return String(decoding: chunk, as: UTF8.self).components(separatedBy: "\n")
+    }
 }

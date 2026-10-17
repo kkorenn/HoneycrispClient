@@ -3,6 +3,7 @@ package dev.honeycrisp.v1_12_2;
 import dev.honeycrisp.Honeycrisp;
 import dev.honeycrisp.platform.Keys;
 import dev.honeycrisp.ui.Screen;
+import dev.honeycrisp.ui.screens.MainMenu;
 import net.minecraft.client.gui.GuiScreen;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
@@ -12,10 +13,12 @@ import java.io.IOException;
 /** Forwards a vanilla GuiScreen's rendering and input to a core Screen, in float GUI coordinates. */
 final class ScreenWrapper extends GuiScreen {
 	final Screen screen;
+	private final Panorama1122 panorama;
 	private float lastX, lastY;
 
 	ScreenWrapper(Screen screen) {
 		this.screen = screen;
+		panorama = screen instanceof MainMenu ? new Panorama1122() : null;
 	}
 
 	private float mouseX() {
@@ -29,12 +32,20 @@ final class ScreenWrapper extends GuiScreen {
 	@Override
 	public void initGui() {
 		Keyboard.enableRepeatEvents(true);
+		if (panorama != null) panorama.setWorldAndResolution(mc, width, height);
 		screen.init(width, height);
 	}
 
 	@Override
+	public void updateScreen() {
+		if (panorama != null) panorama.updateScreen();
+	}
+
+	@Override
 	public void drawScreen(int mouseX, int mouseY, float partialTicks) {
-		if (!screen.transparentBackground() || mc.world == null) {
+		if (panorama != null && mc.world == null) {
+			panorama.drawScreen(mouseX, mouseY, partialTicks);
+		} else if (!screen.transparentBackground() || mc.world == null) {
 			drawDefaultBackground();
 		}
 		float x = Mouse.getX() * width / (float)mc.displayWidth;

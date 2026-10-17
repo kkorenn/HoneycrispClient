@@ -89,15 +89,16 @@ public class Button extends Widget {
 		int fg;
 		switch (style) {
 			case PRIMARY:
-				Gfx.shadow(r, bx, by + u(1), bw, bh, rad, u(4), 0x33000000);
-				Gfx.rect(r, bx, by, bw, bh, rad, accent);
+				Gfx.controlGlass(r, bx, by, bw, bh, rad);
+				Gfx.rect(r, bx, by, bw, bh, rad, reduceTransparency ? accent : alpha(accent, 0.85f));
 				Gfx.stroke(r, bx, by, bw, bh, rad, u(1), 0x26FFFFFF);
 				Gfx.rect(r, bx, by, bw, bh, rad, alpha(0xFFFFFFFF, 0.08f * hv));
 				Gfx.rect(r, bx, by, bw, bh, rad, alpha(0x26000000, pr));
 				fg = onAccent;
 				break;
 			case DESTRUCTIVE_CONFIRM:
-				Gfx.rect(r, bx, by, bw, bh, rad, red);
+				Gfx.controlGlass(r, bx, by, bw, bh, rad);
+				Gfx.rect(r, bx, by, bw, bh, rad, reduceTransparency ? red : alpha(red, 0.85f));
 				Gfx.rect(r, bx, by, bw, bh, rad, alpha(0xFFFFFFFF, 0.08f * hv));
 				fg = 0xFFFFFFFF;
 				break;
@@ -116,8 +117,7 @@ public class Button extends Widget {
 				fg = 0xF2FFFFFF;
 				break;
 			default:
-				Gfx.rect(r, bx, by, bw, bh, rad, fill2);
-				Gfx.stroke(r, bx, by, bw, bh, rad, hairline, dark ? 0x14FFFFFF : 0x0F000000);
+				Gfx.controlGlass(r, bx, by, bw, bh, rad);
 				fg = style == Style.DESTRUCTIVE ? red : Theme.label;
 		}
 		if (selected) {

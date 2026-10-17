@@ -89,6 +89,11 @@ final class Game1122 implements GameInfo {
 	}
 
 	@Override
+	public long worldAge() {
+		return inWorld() ? mc().world.getWorldTime() : 0;
+	}
+
+	@Override
 	public String playerName() {
 		return mc().getSession().getUsername();
 	}

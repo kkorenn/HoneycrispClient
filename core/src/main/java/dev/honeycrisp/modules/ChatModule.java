@@ -8,7 +8,7 @@ public final class ChatModule extends Module {
 	public final NumberSetting backgroundOpacity = setting(new NumberSetting("bgOpacity", "Background Opacity", 0.25, 0, 1, 0.05));
 
 	public ChatModule() {
-		super("chat", "Chat", "Chat appearance", Category.VISUAL, "bubble.left");
+		super("chat", "Chat", "Chat appearance", Category.VISUAL, "bubble.left.and.bubble.right");
 	}
 
 	public float opacity() {

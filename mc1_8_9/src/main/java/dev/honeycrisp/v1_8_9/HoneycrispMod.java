@@ -71,6 +71,11 @@ public final class HoneycrispMod {
 			}
 
 			@Override
+			public void realms() {
+				new net.minecraft.realms.RealmsBridge().switchToRealms(mc.currentScreen);
+			}
+
+			@Override
 			public void options() {
 				mc.displayGuiScreen(new GuiOptions(mc.currentScreen, mc.gameSettings));
 			}
@@ -155,7 +160,7 @@ public final class HoneycrispMod {
 			if (time >= 0 && mc.theWorld != null) {
 				savedTimeInfo = mc.theWorld.getWorldInfo();
 				savedTime = savedTimeInfo.getWorldTime();
-				savedTimeInfo.setWorldTime(savedTime / 24000L * 24000L + time);
+				savedTimeInfo.setWorldTime(Math.floorDiv(savedTime, 24000L) * 24000L + time);
 			}
 			return;
 		}

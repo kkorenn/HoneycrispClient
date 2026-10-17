@@ -52,7 +52,7 @@ public final class ArmorStatusModule extends HudModule {
 			if (!preview && it == null) continue;
 			items[rows] = it;
 			texts[rows] = preview ? (durability.get() == Durability.NONE ? "" : PREVIEW_TEXT[i]) : label(it);
-			colors[rows] = preview ? (i == 3 ? 0xFFFFDD55 : 0xFF55FF55) : damageColor(it);
+			colors[rows] = preview ? (i == 3 ? dev.honeycrisp.ui.widgets.Theme.orange(dev.honeycrisp.ui.widgets.Theme.dark) : color()) : damageColor(it);
 			w = Math.max(w, textWidth(texts[rows]));
 			rows++;
 		}
@@ -74,7 +74,8 @@ public final class ArmorStatusModule extends HudModule {
 		int max = it.maxDurability(), cur = it.durability();
 		if (!colorByDamage.on() || cur < 0 || max <= 0) return color();
 		float f = (float) cur / max;
-		return f > 0.5f ? 0xFF55FF55 : f > 0.25f ? 0xFFFFDD55 : 0xFFFF5555;
+		boolean d = dev.honeycrisp.ui.widgets.Theme.dark;
+		return f > 0.5f ? color() : f >= 0.25f ? dev.honeycrisp.ui.widgets.Theme.orange(d) : dev.honeycrisp.ui.widgets.Theme.red(d);
 	}
 
 	@Override

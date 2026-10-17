@@ -2,7 +2,7 @@ package dev.honeycrisp.ui.screens;
 
 /**
  * Vanilla actions the Honeycrisp Client main menu needs from the version adapter. Adapters register one at startup with
- * {@link #set}; until then the main menu hides the buttons that need it (Singleplayer, Multiplayer, Settings,
+ * {@link #set}; until then the main menu hides the buttons that need it (Singleplayer, Multiplayer, Realms, Settings,
  * Language, Quit) and shows only Mods and Cosmetics. All calls happen on the render thread from a click.
  */
 public interface MenuActions {
@@ -11,6 +11,9 @@ public interface MenuActions {
 
 	/** Opens vanilla's server list. */
 	void multiplayer();
+
+	/** Opens vanilla's Realms screen. */
+	void realms();
 
 	/** Opens vanilla's options screen. */
 	void options();

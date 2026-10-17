@@ -32,3 +32,15 @@ processResources {
 	inputs.property 'version', version
 	filesMatching('mcmod.info') { expand 'version': version }
 }
+
+tasks.named('test') { failOnNoDiscoveredTests = false }
+tasks.register('controlsVerify', JavaExec) {
+	classpath = sourceSets.test.runtimeClasspath
+	mainClass = 'dev.honeycrisp.v1_12_2.coremod.ControlsVerify'
+	javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(8) }
+	argumentProviders.add({
+		def cache = new File(gradle.gradleUserHomeDir, 'caches/essential-loom/minecraftMaven')
+		[fileTree(cache).matching { include '**/forge-1.12.2-*generated-intermediate/**/*.jar'; exclude '**/*sources.jar' }.singleFile.absolutePath,
+		 fileTree(cache).matching { include '**/forge-1.12.2-*intermediate-srg-*.jar' }.singleFile.absolutePath]
+	} as CommandLineArgumentProvider)
+}

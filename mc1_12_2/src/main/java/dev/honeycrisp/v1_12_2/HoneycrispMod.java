@@ -5,9 +5,14 @@ import dev.honeycrisp.hooks.Crosshair;
 import dev.honeycrisp.hooks.Hooks;
 import dev.honeycrisp.hooks.OldAnimation;
 import dev.honeycrisp.platform.Keys;
+import dev.honeycrisp.ui.screens.MenuActions;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiLanguage;
 import net.minecraft.client.gui.GuiMainMenu;
+import net.minecraft.client.gui.GuiMultiplayer;
+import net.minecraft.client.gui.GuiOptions;
 import net.minecraft.client.gui.ScaledResolution;
+import net.minecraft.client.gui.GuiWorldSelection;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.entity.Entity;
 import net.minecraft.world.storage.WorldInfo;
@@ -49,6 +54,38 @@ public final class HoneycrispMod {
 			return;
 		}
 		MinecraftForge.EVENT_BUS.register(this);
+		final Minecraft mc = Minecraft.getMinecraft();
+		MenuActions.set(new MenuActions() { // same screens GuiMainMenu opens; the Honeycrisp menu is the parent
+			@Override
+			public void singleplayer() {
+				mc.displayGuiScreen(new GuiWorldSelection(mc.currentScreen));
+			}
+
+			@Override
+			public void multiplayer() {
+				mc.displayGuiScreen(new GuiMultiplayer(mc.currentScreen));
+			}
+
+			@Override
+			public void realms() {
+				new net.minecraft.realms.RealmsBridge().switchToRealms(mc.currentScreen);
+			}
+
+			@Override
+			public void options() {
+				mc.displayGuiScreen(new GuiOptions(mc.currentScreen, mc.gameSettings));
+			}
+
+			@Override
+			public void language() {
+				mc.displayGuiScreen(new GuiLanguage(mc.currentScreen, mc.gameSettings, mc.getLanguageManager()));
+			}
+
+			@Override
+			public void quit() {
+				mc.shutdown();
+			}
+		});
 	}
 
 	@SubscribeEvent

@@ -18,7 +18,7 @@ public final class SpeedModule extends TextHudModule {
 	private boolean has;
 
 	public SpeedModule() {
-		super("speed", "Speed", "Movement speed in blocks per second", Category.HUD, "hare", Anchor.TOP_LEFT, 4, 112);
+		super("speed", "Speed", "Movement speed in blocks per second", Category.HUD, "gauge.with.dots.needle.67percent", Anchor.TOP_LEFT, 4, 112);
 	}
 
 	@Override

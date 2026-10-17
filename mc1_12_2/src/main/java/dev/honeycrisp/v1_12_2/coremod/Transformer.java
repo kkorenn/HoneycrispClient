@@ -23,6 +23,10 @@ public final class Transformer implements IClassTransformer {
 		if (bytes == null) {
 			return null;
 		}
+		if (transformedName.startsWith("net.minecraft.client.gui.")
+			|| transformedName.startsWith("net.minecraftforge.fml.client.config.")) {
+			bytes = ControlTransformer.transform(bytes);
+		}
 		final boolean entityRenderer = transformedName.equals("net.minecraft.client.renderer.EntityRenderer");
 		final boolean living = transformedName.equals("net.minecraft.client.renderer.entity.RenderLivingBase");
 		final boolean chat = transformedName.equals("net.minecraft.client.gui.GuiNewChat");

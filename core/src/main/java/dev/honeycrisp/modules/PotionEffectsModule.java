@@ -65,11 +65,12 @@ public final class PotionEffectsModule extends HudModule {
 	}
 
 	private void line(String name, int amp, int secs, float y, int c, int dim, float lh) {
+		int timeColor = secs >= 0 && secs < 10 ? dev.honeycrisp.ui.widgets.Theme.red(dev.honeycrisp.ui.widgets.Theme.dark) : showName.on() ? dim : c;
 		if (showName.on()) {
 			text(title(name, amp), PAD + 22, y + row / 2 - lh - 1, c);
-			text(time(secs), PAD + 22, y + row / 2, dim);
+			text(time(secs), PAD + 22, y + row / 2, timeColor);
 		} else {
-			text(time(secs), PAD + 22, y + (18 - lh) / 2, c);
+			text(time(secs), PAD + 22, y + (18 - lh) / 2, timeColor);
 		}
 	}
 

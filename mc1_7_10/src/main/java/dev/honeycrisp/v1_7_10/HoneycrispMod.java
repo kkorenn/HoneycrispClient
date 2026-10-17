@@ -9,6 +9,7 @@ import cpw.mods.fml.common.gameevent.TickEvent;
 import dev.honeycrisp.Honeycrisp;
 import dev.honeycrisp.hooks.Crosshair;
 import dev.honeycrisp.hooks.Hooks;
+import dev.honeycrisp.ui.screens.MenuActions;
 import dev.honeycrisp.platform.Keys;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiMainMenu;
@@ -50,6 +51,38 @@ public final class HoneycrispMod {
 		}
 		FMLCommonHandler.instance().bus().register(this);
 		MinecraftForge.EVENT_BUS.register(this);
+		final Minecraft mc = Minecraft.getMinecraft();
+		MenuActions.set(new MenuActions() { // same screens GuiMainMenu opens; the current (Honeycrisp Client) menu is the parent
+			@Override
+			public void singleplayer() {
+				mc.displayGuiScreen(new net.minecraft.client.gui.GuiSelectWorld(mc.currentScreen));
+			}
+
+			@Override
+			public void multiplayer() {
+				mc.displayGuiScreen(new net.minecraft.client.gui.GuiMultiplayer(mc.currentScreen));
+			}
+
+			@Override
+			public void realms() {
+				new net.minecraft.realms.RealmsBridge().switchToRealms(mc.currentScreen);
+			}
+
+			@Override
+			public void options() {
+				mc.displayGuiScreen(new net.minecraft.client.gui.GuiOptions(mc.currentScreen, mc.gameSettings));
+			}
+
+			@Override
+			public void language() {
+				mc.displayGuiScreen(new net.minecraft.client.gui.GuiLanguage(mc.currentScreen, mc.gameSettings, mc.getLanguageManager()));
+			}
+
+			@Override
+			public void quit() {
+				mc.shutdown();
+			}
+		});
 	}
 
 	@SubscribeEvent
@@ -68,7 +101,7 @@ public final class HoneycrispMod {
 		}
 		hold(mc.gameSettings.keyBindSprint, h.sprintHeld(), mc);
 		hold(mc.gameSettings.keyBindSneak, h.sneakHeld(), mc);
-		if (h.freelookThirdPerson()) {
+		if (h.freelookActive() && h.freelookThirdPerson()) {
 			if (savedPerspective < 0) {
 				savedPerspective = mc.gameSettings.thirdPersonView;
 				if (savedPerspective == 0) {

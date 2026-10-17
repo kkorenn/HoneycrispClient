@@ -161,6 +161,11 @@ public final class McPlatform implements Platform, GameInfo {
 	}
 
 	@Override
+	public long worldAge() {
+		return mc().level == null ? 0 : mc().level.getOverworldClockTime();
+	}
+
+	@Override
 	public String playerName() {
 		return mc().player == null ? mc().getUser().getName() : mc().player.getName().getString();
 	}

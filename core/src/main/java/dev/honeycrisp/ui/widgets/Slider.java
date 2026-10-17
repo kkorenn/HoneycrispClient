@@ -32,7 +32,7 @@ public class Slider extends Widget {
 		if (!enabled) Gfx.opacity *= 0.4f;
 		float th = u(4), cy = y + h / 2, tw = u(22), tH = u(14);
 		float f = (float) s.fraction(), travel = w - tw, tx = x + f * travel;
-		Gfx.capsule(r, x, cy - th / 2, w, th, fill1);
+		Gfx.controlGlass(r, x, cy - th / 2, w, th, th / 2);
 		Gfx.capsule(r, x, cy - th / 2, Math.max(th, tx + tw / 2 - x), th, accent);
 		int n = steps();
 		if (n > 0 && n <= 10) for (int i = 0; i <= n; i++) Gfx.fill(r, x + tw / 2 + travel * i / n - u(1), cy + th / 2 + u(3), u(2), u(6), label3);

@@ -14,7 +14,7 @@ public final class CompassModule extends HudModule {
 	public final NumberSetting range = setting(new NumberSetting("range", "Visible Degrees", 180, 90, 360, 15));
 
 	public CompassModule() {
-		super("compass", "Compass", "Direction strip", Category.HUD, "safari", Anchor.TOP_CENTER, 0, 20);
+		super("compass", "Compass", "Direction strip", Category.HUD, "location.north.circle", Anchor.TOP_CENTER, 0, 20);
 	}
 
 	/** Compass bearing 0..360 (0 = north, 90 = east) from Minecraft yaw (0 = south, 90 = west). */

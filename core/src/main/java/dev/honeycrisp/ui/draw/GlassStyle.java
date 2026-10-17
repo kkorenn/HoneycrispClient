@@ -20,7 +20,7 @@ public final class GlassStyle {
 	public static final GlassStyle WINDOW = new GlassStyle(0xB31C1C1F, 0xEB1E1E21, 12, 0x2EFFFFFF, 0x8C000000, 14, 5);
 	public static final GlassStyle SIDEBAR = new GlassStyle(0x80262629, 0xD9242427, 16, 0x1AFFFFFF, 0, 0, 0);
 	public static final GlassStyle CONTROL = new GlassStyle(0x33FFFFFF, 0x38FFFFFF, 0, 0x1FFFFFFF, 0x40000000, 2, 0.5f);
-	public static final GlassStyle HUD = new GlassStyle(0x8C121214, 0xB3141417, 8, 0x1FFFFFFF, 0x59000000, 6, 1.5f);
+	public static final GlassStyle HUD = new GlassStyle(0x66000000, 0x66000000, 0, 0, 0, 0, 0);
 
 	public GlassStyle(int tint, int fallbackTint, float blurRadius, int highlight, int shadowColor, float shadowBlur, float shadowOffsetY) {
 		this.tint = tint;

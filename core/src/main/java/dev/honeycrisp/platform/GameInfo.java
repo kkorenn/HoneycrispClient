@@ -30,6 +30,11 @@ public interface GameInfo {
 	/** World time of day in ticks (0–24000). */
 	long dayTime();
 
+	/** Total world time in ticks (not modulo 24000). */
+	default long worldAge() {
+		return dayTime();
+	}
+
 	String playerName();
 
 	boolean sprinting();

@@ -1,10 +1,12 @@
 package dev.honeycrisp.module;
 
+import dev.honeycrisp.Honeycrisp;
 import dev.honeycrisp.platform.GameInfo;
+import dev.honeycrisp.platform.Platform;
 import dev.honeycrisp.platform.Renderer;
 import dev.honeycrisp.ui.draw.Draw;
 import dev.honeycrisp.ui.draw.Font;
-import dev.honeycrisp.ui.draw.GlassStyle;
+import dev.honeycrisp.ui.screens.UiPrefs;
 
 /**
  * A draggable HUD element. Subclasses {@link #measure} their unscaled content size, then {@link #render} in local
@@ -12,12 +14,29 @@ import dev.honeycrisp.ui.draw.GlassStyle;
  * Position = anchor point + offset (GUI px); see {@link Anchor#position}.
  */
 public abstract class HudModule extends Module {
+	public enum Style {
+		PILL("Pill"), SHADOW("Shadow"), PLAIN("Plain");
+
+		private final String label;
+
+		Style(String label) {
+			this.label = label;
+		}
+
+		@Override
+		public String toString() {
+			return label;
+		}
+	}
+
 	public static final float PAD = 4;
 
 	public final ChoiceSetting<Anchor> anchor;
 	public final NumberSetting offsetX, offsetY;
+	public final ChoiceSetting<Style> style = setting(new ChoiceSetting<Style>("style", "Style", Style.PILL));
 	public final NumberSetting scale = setting(new NumberSetting("scale", "Scale", 1, 0.5, 3, 0.05));
 	public final BooleanSetting background = setting(new BooleanSetting("background", "Background", true));
+	public final BooleanSetting outline = setting(new BooleanSetting("outline", "Outline", false));
 	public final BooleanSetting shadow = setting(new BooleanSetting("shadow", "Text Shadow", false));
 	public final ColorSetting textColor = setting(new ColorSetting("textColor", "Text Color", 0xFFFFFFFF));
 
@@ -52,7 +71,7 @@ public abstract class HudModule extends Module {
 		oy = y(screenH);
 		r = renderer;
 		try {
-			if (background.on()) drawBackground();
+			if (background.on() && style.get() == Style.PILL) drawBackground();
 			render(renderer, game, partialTick);
 		} finally {
 			r = null;
@@ -106,7 +125,15 @@ public abstract class HudModule extends Module {
 	// ---- drawing helpers (local unscaled coordinates) ----
 
 	protected void drawBackground() {
-		Draw.glass(r, ox, oy, width * sc, height * sc, 4 * sc, GlassStyle.HUD);
+		if (style.get() != Style.PILL) return;
+		float w = width * sc, h = height * sc, rad = 4 * sc;
+		boolean rt = UiPrefs.get().reduceTransparency.on();
+		Draw.roundRect(r, ox, oy, w, h, rad, rt ? 0xF5121214 : 0x66000000);
+		if (outline.on()) {
+			Platform p = Honeycrisp.platform();
+			float hl = p != null && p.guiScale() > 0 ? (float) (1 / p.guiScale()) : 0.5f;
+			Draw.roundRectStroke(r, ox, oy, w, h, rad, hl, 0x1AFFFFFF);
+		}
 	}
 
 	protected float sx(float x) {
@@ -139,7 +166,11 @@ public abstract class HudModule extends Module {
 
 	protected void text(String s, float x, float y, int argb) {
 		Font f = scaledFont();
-		if (shadow.on()) Draw.text(r, s, sx(x) + 0.5f * sc, sy(y) + 0.5f * sc, f, ((argb >>> 24) * 3 / 4) << 24);
+		if (shadow.on() || style.get() == Style.SHADOW) {
+			int a = argb >>> 24;
+			Draw.text(r, s, sx(x) + 1f * sc, sy(y) + 1f * sc, f, (a * 0x40 / 255) << 24);
+			Draw.text(r, s, sx(x) + 0.5f * sc, sy(y) + 0.5f * sc, f, (a * 0x99 / 255) << 24);
+		}
 		Draw.text(r, s, sx(x), sy(y), f, argb);
 	}
 
